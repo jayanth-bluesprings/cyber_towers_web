@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg: #f8fafc;
+    --color-surface: #ffffff;
+    --color-border: #e2e8f0;
+    --color-text: #0f172a;
+    --color-muted: #64748b;
+  }
+  .dark {
+    --color-bg: #020617;
+    --color-surface: #0f172a;
+    --color-border: #1e293b;
+    --color-text: #f1f5f9;
+    --color-muted: #94a3b8;
+  }
+  body {
+    @apply bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans;
+    font-size: 15px;
+  }
+  * {
+    @apply transition-colors duration-150;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm;
+  }
+  .btn-primary {
+    @apply px-4 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg font-semibold text-sm transition-all duration-150 active:scale-95;
+  }
+  .btn-ghost {
+    @apply px-4 py-2 rounded-lg font-semibold text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-150;
+  }
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold font-mono;
+  }
+  .badge-2w {
+    @apply badge bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400;
+  }
+  .badge-4w {
+    @apply badge bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400;
+  }
+  .badge-unknown {
+    @apply badge bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400;
+  }
+  .badge-illegal {
+    @apply badge bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400;
+  }
+  .stat-card {
+    @apply card p-5 flex flex-col gap-1;
+  }
+  .table-row-new {
+    @apply animate-slide-in bg-sky-50 dark:bg-sky-950/30;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 dark:bg-slate-700 rounded-full;
+}
+
+/* Live indicator pulse */
+@keyframes livePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.live-dot {
+  animation: livePulse 1.5s ease-in-out infinite;
+}
