@@ -5,11 +5,14 @@ import { fetchLive, fetchSearch, WS_URL } from '../api/index.js';
 function formatTime(scanTime) {
   if (!scanTime) return '—';
   try {
-    const d = new Date(scanTime);
+    const s = String(scanTime);
+    // Bare DB timestamp has no tz — treat as IST
+    const d = new Date(s.endsWith('Z') || s.includes('+') ? s : s + '+05:30');
     return d.toLocaleString('en-IN', {
       day: '2-digit', month: 'short',
       hour: '2-digit', minute: '2-digit', second: '2-digit',
       hour12: false,
+      timeZone: 'Asia/Calcutta',
     });
   } catch {
     return scanTime;
@@ -61,7 +64,9 @@ function mergeRecords(existing, incoming, maxLen = 200) {
   const seen = new Map(); // key: "CardData|bucket"
   const deduped = [];
   for (const r of sorted) {
-    const scanMs = r.ScanTime ? new Date(r.ScanTime).getTime() : 0;
+    const s = String(r.ScanTime || '');
+    const ts = s.endsWith('Z') || s.includes('+') ? s : s + '+05:30';
+    const scanMs = r.ScanTime ? new Date(ts).getTime() : 0;
     const bucket = Math.floor(scanMs / 1000 / FRONTEND_DEDUP_SECONDS);
     const key = `${(r.CardData || '').toUpperCase()}|${bucket}`;
     if (!seen.has(key)) {
@@ -90,11 +95,10 @@ export default function LiveTable({ onWsStatus }) {
   }, [search]);
 
   // Initial load — runs ONCE to seed the table, then WS takes over.
-  // Polling is disabled (refetchInterval: false) to avoid overwriting WS data.
   const { data: liveData, isLoading } = useQuery({
     queryKey: ['liveRecords'],
     queryFn: fetchLive,
-    refetchInterval: false,        // ← WS handles live updates; no need to re-poll
+    refetchInterval: false,
     refetchOnWindowFocus: false,
     enabled: !debouncedSearch,
   });
@@ -105,7 +109,7 @@ export default function LiveTable({ onWsStatus }) {
     enabled: !!debouncedSearch,
   });
 
-  // Seed records once on initial fetch — never overwrite after WS is live
+  // Seed records once on initial fetch
   useEffect(() => {
     if (!debouncedSearch && liveData?.data && !initialLoaded) {
       setRecords(liveData.data);
@@ -118,7 +122,6 @@ export default function LiveTable({ onWsStatus }) {
     if (debouncedSearch && searchData?.data) {
       setRecords(searchData.data);
     }
-    // When search is cleared, the WS/live state is already in records
   }, [searchData, debouncedSearch]);
 
   // WebSocket
@@ -142,12 +145,10 @@ export default function LiveTable({ onWsStatus }) {
             const incoming = msg.data;
             const ids = new Set(incoming.map((r) => r.CardRecordID));
 
-            // Only update visible table when not searching
             if (!debouncedSearch) {
               setRecords((prev) => mergeRecords(prev, incoming));
             }
 
-            // Highlight new rows
             setNewIds((prev) => new Set([...prev, ...ids]));
             setTimeout(() => {
               setNewIds((prev) => {
@@ -181,7 +182,6 @@ export default function LiveTable({ onWsStatus }) {
 
   const displayRecords = records;
   const loading = isLoading || searchLoading;
-  const rawCount = records.length;
 
   return (
     <div className="card flex flex-col" style={{ minHeight: '480px' }}>
@@ -281,8 +281,7 @@ export default function LiveTable({ onWsStatus }) {
                 return (
                   <tr
                     key={record.CardRecordID}
-                    className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors ${isNew ? 'table-row-new' : ''
-                      } ${illegal ? 'bg-red-50/50 dark:bg-red-950/20' : ''}`}
+                    className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors ${isNew ? 'table-row-new' : ''} ${illegal ? 'bg-red-50/50 dark:bg-red-950/20' : ''}`}
                   >
                     <td className="px-4 py-3">
                       <span className="font-mono text-xs text-slate-600 dark:text-slate-300">

@@ -4,12 +4,18 @@ import StatsCards from '../components/StatsCards.jsx';
 import VehicleChart from '../components/VehicleChart.jsx';
 import LiveTable from '../components/LiveTable.jsx';
 
-export default function Dashboard({ dark, setDark }) {
+export default function Dashboard({ dark, setDark, onNavigate }) {
   const [wsStatus, setWsStatus] = useState('connecting');
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
-      <Navbar dark={dark} setDark={setDark} wsStatus={wsStatus} />
+      <Navbar
+        dark={dark}
+        setDark={setDark}
+        wsStatus={wsStatus}
+        activePage="dashboard"      // ← add this
+        onNavigate={onNavigate}     // ← add this
+      />
 
       <main className="flex-1 max-w-screen-2xl mx-auto w-full px-4 py-5 flex flex-col gap-5">
         {/* Page header */}

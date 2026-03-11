@@ -1,17 +1,39 @@
 import { useState } from 'react';
 
-export default function Navbar({ dark, setDark, wsStatus }) {
+const NAV_ITEMS = [
+  {
+    key: 'dashboard',
+    label: 'Dashboard',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+      </svg>
+    ),
+  },
+  {
+    key: 'report',
+    label: 'Reports',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+  },
+];
+
+export default function Navbar({ dark, setDark, wsStatus, activePage, onNavigate }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <nav className="sticky top-0 z-50 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md">
       <div className="max-w-screen-2xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
+
         {/* Logo */}
         <div className="flex items-center gap-3 min-w-0">
-          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-sky-500 shadow-lg shadow-sky-500/30 flex-shrink-0">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
+          <div className="flex items-center justify-center w-12 h-12 rounded-lg shadow-sm flex-shrink-0 overflow-hidden">
+            <img src="../public/logo.png" className="w-full h-full object-cover" alt="Logo" />
           </div>
           <div className="min-w-0">
             <h1 className="font-display font-bold text-base leading-tight truncate">
@@ -23,16 +45,41 @@ export default function Navbar({ dark, setDark, wsStatus }) {
           </div>
         </div>
 
-        {/* Center: WS status */}
-        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-mono">
-          <span className={`w-2 h-2 rounded-full live-dot ${wsStatus === 'connected' ? 'bg-emerald-500' : wsStatus === 'connecting' ? 'bg-amber-500' : 'bg-red-500'}`} />
-          <span className="text-slate-600 dark:text-slate-300">
-            {wsStatus === 'connected' ? 'Live' : wsStatus === 'connecting' ? 'Connecting...' : 'Offline'}
-          </span>
+        {/* Center: Nav links */}
+        <div className="hidden md:flex items-center gap-1">
+          {NAV_ITEMS.map((item) => {
+            const isActive = activePage === item.key;
+            return (
+              <button
+                key={item.key}
+                onClick={() => onNavigate(item.key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${isActive
+                    ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-100'
+                  }`}
+              >
+                {item.icon}
+                {item.label}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Right controls */}
+        {/* Right: WS status + dark mode + date */}
         <div className="flex items-center gap-2">
+
+          {/* WS status — only on dashboard */}
+          {activePage === 'dashboard' && (
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-mono">
+              <span className={`w-2 h-2 rounded-full live-dot ${wsStatus === 'connected' ? 'bg-emerald-500' :
+                  wsStatus === 'connecting' ? 'bg-amber-500' : 'bg-red-500'
+                }`} />
+              <span className="text-slate-600 dark:text-slate-300">
+                {wsStatus === 'connected' ? 'Live' : wsStatus === 'connecting' ? 'Connecting...' : 'Offline'}
+              </span>
+            </div>
+          )}
+
           {/* Dark mode toggle */}
           <button
             onClick={() => setDark(!dark)}
@@ -49,11 +96,46 @@ export default function Navbar({ dark, setDark, wsStatus }) {
               </svg>
             )}
           </button>
+
+          {/* Date */}
           <div className="text-xs text-slate-400 dark:text-slate-500 hidden lg:block font-mono">
             {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
           </div>
+
+          {/* Mobile nav toggle */}
+          <button
+            onClick={() => setMobileOpen(!mobileOpen)}
+            className="md:hidden w-9 h-9 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            aria-label="Menu"
+          >
+            <svg className="w-5 h-5 text-slate-600 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={mobileOpen ? 'M6 18L18 6M6 6l12 12' : 'M4 6h16M4 12h16M4 18h16'} />
+            </svg>
+          </button>
         </div>
       </div>
+
+      {/* Mobile dropdown */}
+      {mobileOpen && (
+        <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-2 space-y-1">
+          {NAV_ITEMS.map((item) => {
+            const isActive = activePage === item.key;
+            return (
+              <button
+                key={item.key}
+                onClick={() => { onNavigate(item.key); setMobileOpen(false); }}
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${isActive
+                    ? 'bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+              >
+                {item.icon}
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </nav>
   );
 }
