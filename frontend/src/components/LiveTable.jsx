@@ -3,39 +3,80 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchLive, fetchSearch, WS_URL } from '../api/index.js';
 
 function formatTime(scanTime) {
-  if (!scanTime) return '—';
+  if (!scanTime) return '-';
   try {
-    const s = String(scanTime);
-    // Bare DB timestamp has no tz — treat as IST
-    const d = new Date(s.endsWith('Z') || s.includes('+') ? s : s + '+05:30');
+    const raw = String(scanTime).trim();
+    const normalized = raw.endsWith('Z') ? raw.slice(0, -1) : raw;
+    const d = new Date(normalized);
+    if (Number.isNaN(d.getTime())) return raw;
     return d.toLocaleString('en-IN', {
-      day: '2-digit', month: 'short',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
       hour12: false,
-      timeZone: 'Asia/Calcutta',
     });
   } catch {
     return scanTime;
   }
 }
 
-function VehicleBadge({ type }) {
+function VehicleBadge({ vehicleType }) {
+  const type = vehicleType;
   if (type === '2W') return <span className="badge-2w">2W</span>;
   if (type === '4W') return <span className="badge-4w">4W</span>;
   return <span className="badge-unknown">?</span>;
 }
 
-function isIllegal(record) {
-  return !record.PName && !record.vehicleType?.match(/^[24]W$/);
+function getGateInfo(equptName) {
+  const value = String(equptName || '').trim().toLowerCase();
+  if (value === '24074151 - 1' || value.includes('entry') || value === 'in') {
+    return {
+      label: 'Entry',
+      className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+    };
+  }
+  if (value === '24074151 - 2' || value.includes('exit') || value === 'out') {
+    return {
+      label: 'Exit',
+      className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+    };
+  }
+  return {
+    label: equptName || '-',
+    className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+  };
 }
 
 function exportCSV(records) {
-  const headers = ['CardRecordID', 'CardData', 'VehicleType', 'FlatNumber', 'PName', 'PCode', 'DeptName', 'EquptName', 'ScanTime'];
+  const headers = [
+    'CardRecordID',
+    'CardData',
+    'VehicleType',
+    'FlatNumber',
+    'PName',
+    'PCode',
+    'CarNumber',
+    'DeptName',
+    'Remark',
+    'EquptName',
+    'ScanTime',
+  ];
   const rows = records.map((r) => [
-    r.CardRecordID, r.CardData, r.vehicleType, r.flatNumber || r.PCode,
-    r.PName, r.PCode, r.DeptName, r.EquptName, formatTime(r.ScanTime),
+    r.CardRecordID,
+    r.CardData,
+    r.vehicleType || '?',
+    r.flatNumber || r.PCode || '',
+    r.PName || '',
+    r.PCode || '',
+    r.CarNumber || '',
+    r.DeptName || '',
+    r.Remark || '',
+    r.EquptName || '',
+    formatTime(r.ScanTime),
   ]);
-  const csv = [headers, ...rows].map((r) => r.map((v) => `"${v ?? ''}"`).join(',')).join('\n');
+  const csv = [headers, ...rows].map((row) => row.map((v) => `"${v ?? ''}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -45,23 +86,15 @@ function exportCSV(records) {
   URL.revokeObjectURL(url);
 }
 
-// Merge + deduplicate:
-//   1. By CardRecordID (exact database duplicate)
-//   2. By CardData within a 30-second bucket (same physical card scanned multiple
-//      times on one pass — e.g. reader fires twice). Keep only the latest scan
-//      per card per 30-second window.
 const FRONTEND_DEDUP_SECONDS = 30;
 
 function mergeRecords(existing, incoming, maxLen = 200) {
-  // Step 1: merge by CardRecordID
   const byId = new Map(existing.map((r) => [r.CardRecordID, r]));
   for (const r of incoming) byId.set(r.CardRecordID, r);
 
-  // Step 2: deduplicate by CardData + 30-second time bucket
-  const sorted = Array.from(byId.values())
-    .sort((a, b) => b.CardRecordID - a.CardRecordID); // newest first
+  const sorted = Array.from(byId.values()).sort((a, b) => b.CardRecordID - a.CardRecordID);
 
-  const seen = new Map(); // key: "CardData|bucket"
+  const seen = new Map();
   const deduped = [];
   for (const r of sorted) {
     const s = String(r.ScanTime || '');
@@ -73,7 +106,6 @@ function mergeRecords(existing, incoming, maxLen = 200) {
       seen.set(key, true);
       deduped.push(r);
     }
-    // else: duplicate scan in same window — silently dropped
   }
 
   return deduped.slice(0, maxLen);
@@ -88,13 +120,11 @@ export default function LiveTable({ onWsStatus }) {
   const wsRef = useRef(null);
   const reconnectTimer = useRef(null);
 
-  // Debounce search
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 400);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
   }, [search]);
 
-  // Initial load — runs ONCE to seed the table, then WS takes over.
   const { data: liveData, isLoading } = useQuery({
     queryKey: ['liveRecords'],
     queryFn: fetchLive,
@@ -109,7 +139,6 @@ export default function LiveTable({ onWsStatus }) {
     enabled: !!debouncedSearch,
   });
 
-  // Seed records once on initial fetch
   useEffect(() => {
     if (!debouncedSearch && liveData?.data && !initialLoaded) {
       setRecords(liveData.data);
@@ -117,14 +146,12 @@ export default function LiveTable({ onWsStatus }) {
     }
   }, [liveData, debouncedSearch, initialLoaded]);
 
-  // Search results replace table temporarily
   useEffect(() => {
     if (debouncedSearch && searchData?.data) {
       setRecords(searchData.data);
     }
   }, [searchData, debouncedSearch]);
 
-  // WebSocket
   const connectWs = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
@@ -158,7 +185,7 @@ export default function LiveTable({ onWsStatus }) {
               });
             }, 3000);
           }
-        } catch { }
+        } catch {}
       };
 
       ws.onerror = () => onWsStatus?.('error');
@@ -185,7 +212,6 @@ export default function LiveTable({ onWsStatus }) {
 
   return (
     <div className="card flex flex-col" style={{ minHeight: '480px' }}>
-      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-3">
           <div>
@@ -204,7 +230,6 @@ export default function LiveTable({ onWsStatus }) {
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          {/* Search */}
           <div className="relative flex-1 sm:w-64">
             <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -225,7 +250,6 @@ export default function LiveTable({ onWsStatus }) {
             )}
           </div>
 
-          {/* Export */}
           <button
             onClick={() => exportCSV(displayRecords)}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors whitespace-nowrap"
@@ -238,7 +262,6 @@ export default function LiveTable({ onWsStatus }) {
         </div>
       </div>
 
-      {/* Table */}
       <div className="flex-1 overflow-auto">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900/80 backdrop-blur-sm">
@@ -247,7 +270,7 @@ export default function LiveTable({ onWsStatus }) {
               <th className="px-3 py-3 text-center whitespace-nowrap">Type</th>
               <th className="px-3 py-3 text-left whitespace-nowrap hidden md:table-cell">Flat No.</th>
               <th className="px-3 py-3 text-left whitespace-nowrap">Name</th>
-              <th className="px-3 py-3 text-left whitespace-nowrap hidden lg:table-cell">Department</th>
+              <th className="px-3 py-3 text-left whitespace-nowrap hidden lg:table-cell">Car No.</th>
               <th className="px-3 py-3 text-left whitespace-nowrap hidden xl:table-cell">Gate</th>
               <th className="px-3 py-3 text-right whitespace-nowrap">Scan Time</th>
             </tr>
@@ -276,42 +299,39 @@ export default function LiveTable({ onWsStatus }) {
               </tr>
             ) : (
               displayRecords.map((record) => {
-                const illegal = isIllegal(record);
                 const isNew = newIds.has(record.CardRecordID);
+                const gateInfo = getGateInfo(record.EquptName);
                 return (
                   <tr
                     key={record.CardRecordID}
-                    className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors ${isNew ? 'table-row-new' : ''} ${illegal ? 'bg-red-50/50 dark:bg-red-950/20' : ''}`}
+                    className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors ${isNew ? 'table-row-new' : ''}`}
                   >
                     <td className="px-4 py-3">
                       <span className="font-mono text-xs text-slate-600 dark:text-slate-300">
-                        {record.CardData || '—'}
+                        {record.CardData || '-'}
                       </span>
-                      {illegal && (
-                        <span className="ml-2 badge-illegal">ILLEGAL</span>
-                      )}
                     </td>
                     <td className="px-3 py-3 text-center">
-                      <VehicleBadge type={record.vehicleType} />
+                      <VehicleBadge vehicleType={record.vehicleType} />
                     </td>
                     <td className="px-3 py-3 hidden md:table-cell">
                       <span className="font-mono text-xs text-slate-600 dark:text-slate-300">
-                        {record.flatNumber || record.PCode || '—'}
+                        {record.flatNumber || record.PCode || '-'}
                       </span>
                     </td>
                     <td className="px-3 py-3">
                       <span className="font-medium text-slate-800 dark:text-slate-200 truncate max-w-[120px] block">
-                        {record.PName || <span className="text-slate-400 italic">Unknown</span>}
+                        {record.PName && record.PName !== '-' ? record.PName : <span className="text-slate-400 italic">Unknown</span>}
                       </span>
                     </td>
                     <td className="px-3 py-3 hidden lg:table-cell">
                       <span className="text-slate-600 dark:text-slate-400 text-xs truncate max-w-[120px] block">
-                        {record.DeptName || '—'}
+                        {record.CarNumber || '-'}
                       </span>
                     </td>
                     <td className="px-3 py-3 hidden xl:table-cell">
-                      <span className="text-xs text-slate-600 dark:text-slate-400 truncate block max-w-[100px]">
-                        {record.EquptName || '—'}
+                      <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold ${gateInfo.className}`}>
+                        {gateInfo.label}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">

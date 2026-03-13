@@ -1,13 +1,21 @@
-require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const { initWebSocket, startPolling } = require('./websocket');
 const apiRoutes = require('./routes/api');
 const { query } = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const frontendDistPath = path.join(__dirname, '..', 'frontend', 'dist');
+const frontendIndexPath = path.join(frontendDistPath, 'index.html');
+
+function hasFrontendBuild() {
+  return fs.existsSync(frontendIndexPath);
+}
 
 // Middleware
 app.use(cors({
@@ -32,9 +40,18 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
+app.use(express.static(frontendDistPath));
+
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path === '/health') {
+    return next();
+  }
+
+  if (hasFrontendBuild()) {
+    return res.sendFile(frontendIndexPath);
+  }
+
+  return res.status(404).json({ error: 'Route not found' });
 });
 
 // Error handler
@@ -58,6 +75,11 @@ server.listen(PORT, () => {
   console.log(`   API:       http://localhost:${PORT}/api`);
   console.log(`   Health:    http://localhost:${PORT}/health`);
   console.log(`   WebSocket: ws://localhost:${PORT}`);
+  if (hasFrontendBuild()) {
+    console.log(`   App:       http://localhost:${PORT}`);
+  } else {
+    console.log(`   Frontend:  Build frontend/dist to serve the dashboard from this server`);
+  }
   console.log(`\n   DB Server: ${process.env.DB_SERVER}`);
   console.log(`   Database:  ${process.env.DB_DATABASE}\n`);
 });

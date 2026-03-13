@@ -18,9 +18,12 @@ api.interceptors.response.use(
 export const fetchLive = () => api.get('/live');
 export const fetchNew = (lastId) => api.get(`/new?lastId=${lastId}`);
 export const fetchSearch = (q) => api.get(`/search?q=${encodeURIComponent(q)}`);
-export const fetchVehicleStats = () => api.get('/vehicle-stats');
+export const fetchAuthorizedVehicles = () => api.get('/authorized-vehicles');
+export const fetchVehicleStats = (period = 'day') => api.get(`/vehicle-stats?period=${encodeURIComponent(period)}`);
 export const fetchVehicleTypeCount = () => api.get('/vehicle-type-count');
 export const fetchVehicleCount = () => api.get('/vehicle-count');
+export const fetchVehicleOccupancy = (status = '') =>
+  api.get(status ? `/report/occupancy?status=${encodeURIComponent(status)}` : '/report/occupancy');
 
 export const WS_URL = BASE_URL.replace(/^http/, 'ws');
 

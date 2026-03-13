@@ -4,8 +4,9 @@ import StatsCards from '../components/StatsCards.jsx';
 import VehicleChart from '../components/VehicleChart.jsx';
 import LiveTable from '../components/LiveTable.jsx';
 
-export default function Dashboard({ dark, setDark, onNavigate }) {
+export default function Dashboard({ dark, setDark, onNavigate, onLogout, activePage = 'dashboard' }) {
   const [wsStatus, setWsStatus] = useState('connecting');
+  const [period, setPeriod] = useState('day');
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
@@ -13,8 +14,9 @@ export default function Dashboard({ dark, setDark, onNavigate }) {
         dark={dark}
         setDark={setDark}
         wsStatus={wsStatus}
-        activePage="dashboard"      // ← add this
-        onNavigate={onNavigate}     // ← add this
+        activePage={activePage}
+        onNavigate={onNavigate}
+        onLogout={onLogout}
       />
 
       <main className="flex-1 max-w-screen-2xl mx-auto w-full px-4 py-5 flex flex-col gap-5">
@@ -34,10 +36,10 @@ export default function Dashboard({ dark, setDark, onNavigate }) {
         </div>
 
         {/* Stats */}
-        <StatsCards />
+        <StatsCards period={period} setPeriod={setPeriod} />
 
         {/* Charts */}
-        <VehicleChart />
+        <VehicleChart period={period} />
 
         {/* Live Table */}
         <LiveTable onWsStatus={setWsStatus} />

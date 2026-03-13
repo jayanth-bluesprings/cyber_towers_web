@@ -2,17 +2,93 @@ const { query } = require('../db');
 
 const DEDUP_SECONDS = 30;
 
+function isAuthorizedPCodeSql(fieldName) {
+    return `
+      ${fieldName} IS NOT NULL
+      AND LTRIM(RTRIM(CAST(${fieldName} AS NVARCHAR(255)))) NOT IN ('', '-', '0')
+      AND LOWER(LTRIM(RTRIM(CAST(${fieldName} AS NVARCHAR(255))))) NOT IN ('null', 'undefined')
+    `;
+}
+
+function buildSessionCTE(dateWhere = '') {
+    return `
+      WITH Deduped AS (
+        SELECT
+          c.CardRecordID,
+          c.CardData,
+          c.PName,
+          c.PCode,
+          p.Addr,
+          c.EquptName,
+          DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') AS ScanTime,
+          CASE
+            WHEN UPPER(LTRIM(RTRIM(p.PDesc))) = '2W' THEN '2-Wheeler'
+            WHEN UPPER(LTRIM(RTRIM(p.PDesc))) = '4W' THEN '4-Wheeler'
+            ELSE 'Other'
+          END AS VehicleType,
+          CASE
+            WHEN LTRIM(RTRIM(c.EquptName)) = '24074151 - 1' THEN 'Entry'
+            WHEN LTRIM(RTRIM(c.EquptName)) = '24074151 - 2' THEN 'Exit'
+            WHEN LOWER(c.EquptName) LIKE '%entry%' OR LOWER(c.EquptName) = 'in' THEN 'Entry'
+            WHEN LOWER(c.EquptName) LIKE '%exit%' OR LOWER(c.EquptName) = 'out' THEN 'Exit'
+            ELSE 'Unknown'
+          END AS GateDir,
+          ROW_NUMBER() OVER (
+            PARTITION BY c.CardData, CAST(c.DataTime * 86400 / ${DEDUP_SECONDS} AS BIGINT)
+            ORDER BY c.CardRecordID DESC
+          ) AS rn
+        FROM CardRecord c
+        LEFT JOIN Personnel p ON p.PersonnelID = c.PersonnelID
+        WHERE 1=1 ${dateWhere}
+      ),
+      Clean AS (
+        SELECT CardRecordID, CardData, PName, PCode, Addr, VehicleType, EquptName, GateDir, ScanTime
+        FROM Deduped
+        WHERE rn = 1
+          AND GateDir <> 'Unknown'
+          AND ${isAuthorizedPCodeSql('PCode')}
+      ),
+      WithNext AS (
+        SELECT
+          CardData,
+          PName,
+          PCode,
+          Addr,
+          VehicleType,
+          ScanTime AS CurTime,
+          EquptName AS CurGate,
+          GateDir AS CurDir,
+          LEAD(ScanTime) OVER (PARTITION BY CardData ORDER BY ScanTime) AS NextTime,
+          LEAD(EquptName) OVER (PARTITION BY CardData ORDER BY ScanTime) AS NextGate,
+          LEAD(GateDir) OVER (PARTITION BY CardData ORDER BY ScanTime) AS NextDir
+        FROM Clean
+      ),
+      Sessions AS (
+        SELECT
+          CardData,
+          PName,
+          PCode,
+          Addr,
+          VehicleType,
+          CurTime AS EntryTime,
+          CurGate AS EntryGate,
+          CASE WHEN NextDir = 'Exit' THEN NextTime ELSE NULL END AS ExitTime,
+          CASE WHEN NextDir = 'Exit' THEN NextGate ELSE NULL END AS ExitGate,
+          CASE WHEN NextDir = 'Exit' THEN 'Exited' ELSE 'Still Inside' END AS Status
+        FROM WithNext
+        WHERE CurDir = 'Entry'
+      )
+    `;
+}
+
 function toISTString(val) {
     if (!val) return null;
-    const s = String(val);
-    const d = new Date(s.endsWith('Z') || s.includes('+') ? s : s + '+05:30');
+    const d = new Date(val);
     if (isNaN(d)) return null;
     const pad = (n) => String(n).padStart(2, '0');
-    const utcMs = d.getTime() + (d.getTimezoneOffset() * 60000);
-    const t = new Date(utcMs + 5.5 * 3600000);
     return (
-        `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}` +
-        `T${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}+05:30`
+        `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}` +
+        `T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
     );
 }
 
@@ -48,17 +124,19 @@ async function getReportSummary(req, res) {
         const result = await query(`
       WITH Deduped AS (
         SELECT
-          CardData,
-          EquptName,
-          DATEADD(SECOND, DataTime * 86400, '1899-12-30') AS ScanTime,
+          c.CardData,
+          p.PDesc AS Remark,
+          c.EquptName,
+          DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') AS ScanTime,
           ROW_NUMBER() OVER (
-            PARTITION BY CardData, CAST(DataTime * 86400 / ${DEDUP_SECONDS} AS BIGINT)
-            ORDER BY CardRecordID DESC
+            PARTITION BY c.CardData, CAST(c.DataTime * 86400 / ${DEDUP_SECONDS} AS BIGINT)
+            ORDER BY c.CardRecordID DESC
           ) AS rn
-        FROM CardRecord
+        FROM CardRecord c
+        LEFT JOIN Personnel p ON p.PersonnelID = c.PersonnelID
       ),
       Clean AS (
-        SELECT CardData, EquptName, ScanTime
+        SELECT CardData, Remark, EquptName, ScanTime
         FROM Deduped WHERE rn = 1
       ),
       LastScan AS (
@@ -69,12 +147,24 @@ async function getReportSummary(req, res) {
                  ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
                ) AS LastGate
         FROM Clean
+      ),
+      LastGateClassified AS (
+        SELECT
+          CardData,
+          CASE
+            WHEN LTRIM(RTRIM(LastGate)) = '24074151 - 1' THEN 'Entry'
+            WHEN LTRIM(RTRIM(LastGate)) = '24074151 - 2' THEN 'Exit'
+            WHEN LOWER(LastGate) LIKE '%entry%' OR LOWER(LastGate) = 'in' THEN 'Entry'
+            WHEN LOWER(LastGate) LIKE '%exit%' OR LOWER(LastGate) = 'out' THEN 'Exit'
+            ELSE 'Unknown'
+          END AS LastGateDir
+        FROM LastScan
       )
       SELECT
         (SELECT COUNT(DISTINCT CardData) FROM Clean)                                AS TotalVehicles,
-        (SELECT COUNT(*) FROM Clean WHERE LEFT(CardData,1)='2')                    AS TwoWheeler,
-        (SELECT COUNT(*) FROM Clean WHERE LEFT(CardData,1)='4')                    AS FourWheeler,
-        (SELECT COUNT(*) FROM LastScan WHERE LOWER(LastGate) LIKE '%entry%')       AS StillInside
+        (SELECT COUNT(*) FROM Clean WHERE UPPER(LTRIM(RTRIM(Remark))) = '2W')      AS TwoWheeler,
+        (SELECT COUNT(*) FROM Clean WHERE UPPER(LTRIM(RTRIM(Remark))) = '4W')      AS FourWheeler,
+        (SELECT COUNT(*) FROM LastGateClassified WHERE LastGateDir = 'Entry')      AS StillInside
     `);
 
         const r = result.recordset[0];
@@ -105,98 +195,68 @@ async function getReportRecords(req, res) {
         const search = req.query.search || '';
         const status = req.query.status || '';
         const download = req.query.download === '1';
+        const all = req.query.all === '1';
 
         const dateConditions = [];
-        if (from) dateConditions.push(`DATEADD(SECOND, DataTime * 86400, '1899-12-30') >= '${from} 00:00:00'`);
-        if (to) dateConditions.push(`DATEADD(SECOND, DataTime * 86400, '1899-12-30') <= '${to} 23:59:59'`);
+        if (from) {
+            dateConditions.push(`DATEADD(SECOND, DataTime * 86400, '1899-12-30') >= '${from} 00:00:00'`);
+        }
+        if (to) {
+            dateConditions.push(`DATEADD(SECOND, DataTime * 86400, '1899-12-30') <= '${to} 23:59:59'`);
+        }
         const dateWhere = dateConditions.length ? 'AND ' + dateConditions.join(' AND ') : '';
 
         const sessionConditions = [];
-        if (type === '2') sessionConditions.push(`LEFT(s.CardData,1) = '2'`);
-        if (type === '4') sessionConditions.push(`LEFT(s.CardData,1) = '4'`);
-        if (search) sessionConditions.push(`s.CardData LIKE '%${search.replace(/'/g, "''")}%'`);
+        if (type === '2') sessionConditions.push(`s.VehicleType = '2-Wheeler'`);
+        if (type === '4') sessionConditions.push(`s.VehicleType = '4-Wheeler'`);
         if (status === 'inside') sessionConditions.push(`s.ExitTime IS NULL`);
         if (status === 'exited') sessionConditions.push(`s.ExitTime IS NOT NULL`);
+        if (search) {
+            const safeSearch = search.replace(/'/g, "''");
+            sessionConditions.push(`(
+                CAST(s.CardData AS NVARCHAR(255)) LIKE '%${safeSearch}%'
+                OR CAST(s.PName AS NVARCHAR(255)) LIKE '%${safeSearch}%'
+                OR CAST(s.PCode AS NVARCHAR(255)) LIKE '%${safeSearch}%'
+                OR CAST(s.Addr AS NVARCHAR(255)) LIKE '%${safeSearch}%'
+            )`);
+        }
         const sessionWhere = sessionConditions.length ? 'WHERE ' + sessionConditions.join(' AND ') : '';
 
-        // NOTE: We match gate names flexibly:
-        //   Entry = EquptName contains 'entry' (case-insensitive) OR is exactly 'in'
-        //   Exit  = EquptName contains 'exit'  (case-insensitive) OR is exactly 'out'
-        // Adjust the CASE expressions below if your gate names are different.
-        // Visit /api/report/debug to see your actual EquptName values.
-        const cte = `
-      WITH Deduped AS (
-        SELECT
-          CardRecordID,
-          CardData,
-          EquptName,
-          DATEADD(SECOND, DataTime * 86400, '1899-12-30') AS ScanTime,
-          CASE WHEN LEFT(CardData,1)='2' THEN '2-Wheeler'
-               WHEN LEFT(CardData,1)='4' THEN '4-Wheeler'
-               ELSE 'Other' END AS VehicleType,
-          -- Normalise gate direction
-          CASE
-            WHEN LOWER(EquptName) LIKE '%entry%' OR LOWER(EquptName) = 'in'  THEN 'Entry'
-            WHEN LOWER(EquptName) LIKE '%exit%'  OR LOWER(EquptName) = 'out' THEN 'Exit'
-            ELSE 'Entry'   -- treat unknown gates as Entry so they show up
-          END AS GateDir,
-          ROW_NUMBER() OVER (
-            PARTITION BY CardData, CAST(DataTime * 86400 / ${DEDUP_SECONDS} AS BIGINT)
-            ORDER BY CardRecordID DESC
-          ) AS rn
-        FROM CardRecord
-        WHERE 1=1 ${dateWhere}
-      ),
-      Clean AS (
-        SELECT CardRecordID, CardData, VehicleType, EquptName, GateDir, ScanTime
-        FROM Deduped WHERE rn = 1
-      ),
-      WithNext AS (
-        SELECT
-          CardData,
-          VehicleType,
-          ScanTime  AS CurTime,
-          EquptName AS CurGate,
-          GateDir   AS CurDir,
-          LEAD(ScanTime)   OVER (PARTITION BY CardData ORDER BY ScanTime) AS NextTime,
-          LEAD(EquptName)  OVER (PARTITION BY CardData ORDER BY ScanTime) AS NextGate,
-          LEAD(GateDir)    OVER (PARTITION BY CardData ORDER BY ScanTime) AS NextDir
-        FROM Clean
-      ),
-      Sessions AS (
-        SELECT
-          CardData,
-          VehicleType,
-          CurTime  AS EntryTime,
-          CurGate  AS EntryGate,
-          CASE WHEN NextDir = 'Exit' THEN NextTime ELSE NULL END AS ExitTime,
-          CASE WHEN NextDir = 'Exit' THEN NextGate ELSE NULL END AS ExitGate,
-          CASE WHEN NextDir = 'Exit' THEN 'Exited' ELSE 'Still Inside' END AS Status
-        FROM WithNext
-        WHERE CurDir = 'Entry'
-      )
-    `;
+        const cte = buildSessionCTE(dateWhere);
 
         if (download) {
             const rows = await query(`
         ${cte}
-        SELECT s.CardData, s.VehicleType, s.EntryTime, s.EntryGate,
+        SELECT s.CardData, s.PName, s.PCode, s.Addr, s.VehicleType, s.EntryTime, s.EntryGate,
                s.ExitTime, s.ExitGate, s.Status
         FROM Sessions s
         ${sessionWhere}
         ORDER BY s.EntryTime DESC
       `);
 
-            const header = 'Card Data,Vehicle Type,Entry Time,Entry Gate,Exit Time,Exit Gate,Status';
-            const csvRows = rows.recordset.map(r => [
-                `"${String(r.CardData || '').replace(/"/g, '""')}"`,
-                `"${r.VehicleType}"`,
-                `"${toISTString(r.EntryTime) || ''}"`,
-                `"${String(r.EntryGate || '').replace(/"/g, '""')}"`,
-                `"${r.ExitTime ? toISTString(r.ExitTime) : 'Still Inside'}"`,
-                `"${r.ExitTime ? String(r.ExitGate || '').replace(/"/g, '""') : '—'}"`,
-                `"${r.Status}"`,
-            ].join(','));
+            const header = 'Card ID,Name,Flat,Access Code,Vehicle Type,Entry Time,Exit Time,Duration,Status';
+            const csvRows = rows.recordset.map((r) => {
+                const start = r.EntryTime ? new Date(r.EntryTime) : null;
+                const end = r.ExitTime ? new Date(r.ExitTime) : new Date();
+                const totalMinutes = start && !isNaN(start) && end && !isNaN(end)
+                    ? Math.max(0, Math.floor((end.getTime() - start.getTime()) / 60000))
+                    : null;
+                const hours = totalMinutes == null ? '' : Math.floor(totalMinutes / 60);
+                const minutes = totalMinutes == null ? '' : totalMinutes % 60;
+                const duration = totalMinutes == null ? '' : `${hours}h ${minutes}m`;
+
+                return [
+                    `"${String(r.CardData || '').replace(/"/g, '""')}"`,
+                    `"${String(r.PName || '').replace(/"/g, '""')}"`,
+                    `"${String(r.Addr || '').replace(/"/g, '""')}"`,
+                    `"${String(r.PCode || '').replace(/"/g, '""')}"`,
+                    `"${String(r.VehicleType || '').replace(/"/g, '""')}"`,
+                    `"${toISTString(r.EntryTime) || ''}"`,
+                    `"${r.ExitTime ? toISTString(r.ExitTime) : 'Still Inside'}"`,
+                    `"${duration}"`,
+                    `"${String(r.Status || '').replace(/"/g, '""')}"`,
+                ].join(',');
+            });
 
             const csv = [header, ...csvRows].join('\n');
             res.setHeader('Content-Type', 'text/csv');
@@ -204,10 +264,35 @@ async function getReportRecords(req, res) {
             return res.send(csv);
         }
 
+        if (all) {
+            const allRows = await query(`
+      ${cte}
+      SELECT s.CardData, s.PName, s.PCode, s.Addr, s.VehicleType, s.EntryTime, s.EntryGate,
+             s.ExitTime, s.ExitGate, s.Status
+      FROM Sessions s
+      ${sessionWhere}
+      ORDER BY s.EntryTime DESC
+    `);
+
+            const normalisedAll = allRows.recordset.map((r) => ({
+                ...r,
+                EntryTime: toISTString(r.EntryTime),
+                ExitTime: r.ExitTime ? toISTString(r.ExitTime) : null,
+            }));
+
+            return res.json({
+                success: true,
+                data: {
+                    records: normalisedAll,
+                    total: normalisedAll.length,
+                },
+            });
+        }
+
         const combined = await query(`
       ${cte},
       Filtered AS (
-        SELECT s.CardData, s.VehicleType, s.EntryTime, s.EntryGate,
+        SELECT s.CardData, s.PName, s.PCode, s.Addr, s.VehicleType, s.EntryTime, s.EntryGate,
                s.ExitTime, s.ExitGate, s.Status,
                COUNT(*) OVER () AS TotalRows
         FROM Sessions s
@@ -236,4 +321,77 @@ async function getReportRecords(req, res) {
     }
 }
 
-module.exports = { getDebug, getReportSummary, getReportRecords };
+// GET /api/report/occupancy
+async function getVehicleOccupancy(req, res) {
+    try {
+        const status = req.query.status || '';
+
+        const result = await query(`
+      ${buildSessionCTE()}
+      , LatestSessions AS (
+        SELECT
+          s.CardData,
+          s.PName,
+          s.PCode,
+          s.Addr,
+          s.VehicleType,
+          s.EntryTime,
+          s.EntryGate,
+          s.ExitTime,
+          s.ExitGate,
+          s.Status,
+          ROW_NUMBER() OVER (
+            PARTITION BY s.CardData
+            ORDER BY COALESCE(s.ExitTime, s.EntryTime) DESC, s.EntryTime DESC
+          ) AS rn
+        FROM Sessions s
+      ),
+      CurrentStatus AS (
+        SELECT
+          CardData,
+          PName,
+          PCode,
+          Addr,
+          VehicleType,
+          EntryTime,
+          EntryGate,
+          ExitTime,
+          ExitGate,
+          Status
+        FROM LatestSessions
+        WHERE rn = 1
+      )
+      SELECT * FROM CurrentStatus
+      ORDER BY COALESCE(ExitTime, EntryTime) DESC, EntryTime DESC
+    `);
+
+        const allRecords = result.recordset.map((r) => ({
+            ...r,
+            EntryTime: toISTString(r.EntryTime),
+            ExitTime: r.ExitTime ? toISTString(r.ExitTime) : null,
+        }));
+
+        const insideRecords = allRecords.filter((r) => r.Status === 'Still Inside');
+        const outsideRecords = allRecords.filter((r) => r.Status === 'Exited');
+
+        const filteredRecords = status === 'inside'
+            ? insideRecords
+            : status === 'outside'
+                ? outsideRecords
+                : allRecords;
+
+        res.json({
+            success: true,
+            data: {
+                insideCount: insideRecords.length,
+                outsideCount: outsideRecords.length,
+                records: filteredRecords,
+            },
+        });
+    } catch (err) {
+        console.error('getVehicleOccupancy error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+}
+
+module.exports = { getDebug, getReportSummary, getReportRecords, getVehicleOccupancy };

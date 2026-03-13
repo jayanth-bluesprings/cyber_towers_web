@@ -1,5 +1,4 @@
 const WebSocket = require('ws');
-
 let wss = null;
 let lastKnownId = 0;
 let pollInterval = null;
@@ -7,16 +6,22 @@ let pollInterval = null;
 // Must match DEDUP_SECONDS in liveController.js
 const DEDUP_SECONDS = 30;
 
+function authorizedSql(fieldName) {
+  return `
+    ${fieldName} IS NOT NULL
+    AND LTRIM(RTRIM(CAST(${fieldName} AS NVARCHAR(255)))) NOT IN ('', '-', '0')
+    AND LOWER(LTRIM(RTRIM(CAST(${fieldName} AS NVARCHAR(255))))) NOT IN ('null', 'undefined')
+  `;
+}
+
 function initWebSocket(server) {
   wss = new WebSocket.Server({ server });
-
   wss.on('connection', (ws) => {
     console.log('🔌 WebSocket client connected');
     ws.send(JSON.stringify({ type: 'connected', message: 'Live feed connected' }));
     ws.on('close', () => console.log('🔌 WebSocket client disconnected'));
     ws.on('error', (err) => console.error('WebSocket error:', err.message));
   });
-
   console.log('✅ WebSocket server initialized');
   return wss;
 }
@@ -38,35 +43,37 @@ function startPolling(queryFn) {
     .catch(() => { });
 
   let isPolling = false;
-
   pollInterval = setInterval(async () => {
     if (isPolling) return;
     isPolling = true;
     try {
-      // Use the same dedup CTE as liveController so WS pushes are also deduped.
-      // We fetch rows with CardRecordID > lastKnownId, then apply 30-second dedup
-      // within that window so the frontend never receives duplicate card scans.
       const result = await queryFn(`
         WITH NewRows AS (
           SELECT
-            CardRecordID,
-            CardData,
-            PName,
-            PCode,
-            DeptName,
-            EquptName,
-            DATEADD(SECOND, DataTime * 86400, '1899-12-30') AS ScanTime,
+            c.CardRecordID,
+            c.CardData,
+            c.PName,
+            c.PCode,
+            c.DeptName,
+            c.EquptName,
+            p.Addr,
+            pe2.CarNumber,
+            p.PDesc AS Remark,
+            DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') AS ScanTime,
             ROW_NUMBER() OVER (
               PARTITION BY
-                CardData,
-                CAST(DataTime * 86400 / ${DEDUP_SECONDS} AS BIGINT)
-              ORDER BY CardRecordID DESC
+                c.CardData,
+                CAST(c.DataTime * 86400 / ${DEDUP_SECONDS} AS BIGINT)
+              ORDER BY c.CardRecordID DESC
             ) AS rn
-          FROM CardRecord
-          WHERE CardRecordID > ${lastKnownId}
+          FROM CardRecord c
+          LEFT JOIN Personnel p ON p.PersonnelID = c.PersonnelID
+          LEFT JOIN PersonnelExtend2 pe2 ON pe2.PersonnelID = c.PersonnelID
+          WHERE c.CardRecordID > ${lastKnownId}
+            AND ${authorizedSql('c.PCode')}
         )
         SELECT TOP 50
-          CardRecordID, CardData, PName, PCode, DeptName, EquptName, ScanTime
+          CardRecordID, CardData, PName, PCode, DeptName, EquptName, Addr, CarNumber, Remark, ScanTime
         FROM NewRows
         WHERE rn = 1
         ORDER BY CardRecordID ASC
@@ -74,8 +81,8 @@ function startPolling(queryFn) {
 
       if (result.recordset.length > 0) {
         const newRecords = result.recordset.map(enrichRecord);
-        // Advance lastKnownId to the absolute max — including dupes we filtered out —
-        // so we don't re-fetch them next tick.
+
+        // Advance lastKnownId to the absolute max including dupes we filtered out
         const maxIdResult = await queryFn(
           `SELECT MAX(CardRecordID) AS MaxId FROM CardRecord WHERE CardRecordID > ${lastKnownId}`
         );
@@ -94,15 +101,13 @@ function startPolling(queryFn) {
 }
 
 function enrichRecord(record) {
-  const card = (record.CardData || '').toUpperCase();
-  let vehicleType = 'Unknown';
-  if (card.startsWith('2W')) vehicleType = '2W';
-  else if (card.startsWith('4W')) vehicleType = '4W';
-
-  const flatMatch = (record.PCode || '').match(/^[A-Z]-\d{3}$/i);
-  const flatNumber = flatMatch ? record.PCode : null;
-
-  return { ...record, vehicleType, flatNumber };
+  const remark = record.Remark == null ? '' : record.Remark.toString().trim().toUpperCase();
+  const vehicleType = remark === '2W' || remark === '4W' ? remark : null;
+  return {
+    ...record,
+    flatNumber: record.Addr || null,
+    vehicleType,
+  };
 }
 
 function stopPolling() {
