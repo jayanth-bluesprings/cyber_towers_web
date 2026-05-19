@@ -1,59 +1,41 @@
 const { query } = require('../db');
-const { enrichRecord } = require('../websocket');
+const { getPersonnelMap, enrichWithCache } = require('../personnelCache');
 
-// Same card scanned within this many seconds = duplicate, keep only the latest scan.
-const DEDUP_SECONDS = 30;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const BASE_DATE = new Date('1899-12-30').getTime();
 
-function authorizedSql(fieldName) {
-  return `
-    ${fieldName} IS NOT NULL
-    AND LTRIM(RTRIM(CAST(${fieldName} AS NVARCHAR(255)))) NOT IN ('', '-', '0')
-    AND LOWER(LTRIM(RTRIM(CAST(${fieldName} AS NVARCHAR(255))))) NOT IN ('null', 'undefined')
-  `;
-}
-
-// CTE: partitions by CardData + 30-second time bucket, keeps only the highest
-// CardRecordID per bucket (rn = 1). Eliminates repeated scans from the same
-// card reader firing multiple times on a single vehicle pass-through.
-function dedupCTE() {
-  return `
-    WITH RankedScans AS (
-      SELECT
-        c.CardRecordID,
-        c.CardData,
-        c.PName,
-        c.PCode,
-        c.DeptName,
-        c.EquptName,
-        p.Addr,
-        pe2.CarNumber,
-        p.PDesc AS Remark,
-        DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') AS ScanTime,
-        ROW_NUMBER() OVER (
-          PARTITION BY
-            c.CardData,
-            CAST(c.DataTime * 86400 / ${DEDUP_SECONDS} AS BIGINT)
-          ORDER BY c.CardRecordID DESC
-        ) AS rn
-      FROM CardRecord c
-      LEFT JOIN Personnel p ON p.PersonnelID = c.PersonnelID
-      LEFT JOIN PersonnelExtend2 pe2 ON pe2.PersonnelID = c.PersonnelID
-    )
-  `;
+function toDataTimeFloat(dateStr, inclusiveEnd = false) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return null;
+  if (inclusiveEnd) d.setDate(d.getDate() + 1); // include end date fully
+  return (d.getTime() - BASE_DATE) / MS_PER_DAY;
 }
 
 async function getLive(req, res) {
   try {
+    const { startDate, endDate } = req.query;
+    const startFloat = toDataTimeFloat(startDate);
+    const endFloat = toDataTimeFloat(endDate, true);
+    const limit = Math.min(parseInt(req.query.limit || '4000', 10) || 4000, 5000);
+
+    const personnelMap = await getPersonnelMap();
+    const whereParts = [];
+    const params = {};
+    if (startFloat !== null) { whereParts.push('c.DataTime >= @startFloat'); params.startFloat = startFloat; }
+    if (endFloat !== null) { whereParts.push('c.DataTime < @endFloat'); params.endFloat = endFloat; }
+    const whereClause = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
+
     const result = await query(`
-      ${dedupCTE()}
-      SELECT TOP 100
-        CardRecordID, CardData, PName, PCode, DeptName, EquptName, Addr, CarNumber, Remark, ScanTime
-      FROM RankedScans
-      WHERE rn = 1
-        AND ${authorizedSql('PCode')}
-      ORDER BY CardRecordID DESC
-    `);
-    const records = result.recordset.map(enrichRecord);
+      SET NOCOUNT ON;
+      SELECT TOP ${limit}
+        c.CardRecordID, c.CardData, c.PName, c.PCode, c.DeptName, c.EquptName, c.PersonnelID, c.PortNum,
+        DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') AS ScanTime
+      FROM CardRecord c WITH (NOLOCK)
+      ${whereClause}
+      ORDER BY c.CardRecordID DESC
+    `, params);
+    const records = result.recordset.map(r => enrichWithCache(r, personnelMap));
     res.json({ success: true, data: records });
   } catch (err) {
     console.error('getLive error:', err.message);
@@ -64,18 +46,23 @@ async function getLive(req, res) {
 async function getNew(req, res) {
   const lastId = parseInt(req.query.lastId || '0');
   try {
+    const personnelMap = await getPersonnelMap();
     const result = await query(
-      `${dedupCTE()}
-      SELECT TOP 100
-        CardRecordID, CardData, PName, PCode, DeptName, EquptName, Addr, CarNumber, Remark, ScanTime
-      FROM RankedScans
-      WHERE rn = 1
-        AND CardRecordID > @lastId
-        AND ${authorizedSql('PCode')}
-      ORDER BY CardRecordID ASC`,
+      `SET NOCOUNT ON;
+      WITH RecentRows AS (
+        SELECT TOP 500 * 
+        FROM CardRecord WITH (NOLOCK)
+        WHERE CardRecordID > @lastId
+        ORDER BY CardRecordID ASC
+      )
+      SELECT
+        c.CardRecordID, c.CardData, c.PName, c.PCode, c.DeptName, c.EquptName, c.PersonnelID, c.PortNum,
+        DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') AS ScanTime
+      FROM RecentRows c
+      ORDER BY c.CardRecordID ASC`,
       { lastId }
     );
-    const records = result.recordset.map(enrichRecord);
+    const records = result.recordset.map(r => enrichWithCache(r, personnelMap));
     res.json({ success: true, data: records });
   } catch (err) {
     console.error('getNew error:', err.message);
@@ -84,22 +71,36 @@ async function getNew(req, res) {
 }
 
 async function search(req, res) {
-  const { q } = req.query;
+  const { q, startDate, endDate } = req.query;
   if (!q) return res.json({ success: true, data: [] });
   const like = `%${q}%`;
+  const startFloat = toDataTimeFloat(startDate);
+  const endFloat = toDataTimeFloat(endDate, true);
   try {
+    const personnelMap = await getPersonnelMap();
+    const whereParts = [];
+    const params = { like };
+    if (startFloat !== null) { whereParts.push('c.DataTime >= @startFloat'); params.startFloat = startFloat; }
+    if (endFloat !== null) { whereParts.push('c.DataTime < @endFloat'); params.endFloat = endFloat; }
+    const whereClause = whereParts.length ? `AND ${whereParts.join(' AND ')}` : '';
+
     const result = await query(
-      `${dedupCTE()}
+      `SET NOCOUNT ON;
+      WITH RecentRows AS (
+        SELECT TOP 3000 * 
+        FROM CardRecord WITH (NOLOCK)
+        ORDER BY CardRecordID DESC
+      )
       SELECT TOP 100
-        CardRecordID, CardData, PName, PCode, DeptName, EquptName, Addr, CarNumber, Remark, ScanTime
-      FROM RankedScans
-      WHERE rn = 1
-        AND ${authorizedSql('PCode')}
-        AND (CardData LIKE @like OR PName LIKE @like OR PCode LIKE @like)
-      ORDER BY CardRecordID DESC`,
-      { like }
+        c.CardRecordID, c.CardData, c.PName, c.PCode, c.DeptName, c.EquptName, c.PersonnelID, c.PortNum,
+        DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') AS ScanTime
+      FROM RecentRows c
+      WHERE (c.CardData LIKE @like OR c.PName LIKE @like OR c.PCode LIKE @like)
+        ${whereClause}
+      ORDER BY c.CardRecordID DESC`,
+      params
     );
-    const records = result.recordset.map(enrichRecord);
+    const records = result.recordset.map(r => enrichWithCache(r, personnelMap));
     res.json({ success: true, data: records });
   } catch (err) {
     console.error('search error:', err.message);
@@ -109,39 +110,12 @@ async function search(req, res) {
 
 async function getAuthorizedVehicles(req, res) {
   try {
-    const result = await query(`
-      WITH LatestAuthorized AS (
-        SELECT
-          c.CardData,
-          c.PName,
-          c.PCode,
-          p.Addr,
-          pe2.CarNumber,
-          p.PDesc AS Remark,
-          DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') AS ScanTime,
-          ROW_NUMBER() OVER (
-            PARTITION BY c.CardData
-            ORDER BY c.CardRecordID DESC
-          ) AS rn
-        FROM CardRecord c
-        LEFT JOIN Personnel p ON p.PersonnelID = c.PersonnelID
-        LEFT JOIN PersonnelExtend2 pe2 ON pe2.PersonnelID = c.PersonnelID
-        WHERE ${authorizedSql('c.PCode')}
-      )
-      SELECT
-        CardData,
-        PName,
-        PCode,
-        Addr,
-        CarNumber,
-        Remark,
-        ScanTime
-      FROM LatestAuthorized
-      WHERE rn = 1
-      ORDER BY PName ASC, CardData ASC
-    `);
-
-    const records = result.recordset.map(enrichRecord);
+    const personnelMap = await getPersonnelMap();
+    const uniqueRecords = new Map();
+    for (const record of personnelMap.values()) {
+        uniqueRecords.set(record.PersonnelID, record);
+    }
+    const records = Array.from(uniqueRecords.values());
     res.json({ success: true, data: records });
   } catch (err) {
     console.error('getAuthorizedVehicles error:', err.message);

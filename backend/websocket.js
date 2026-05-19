@@ -1,21 +1,27 @@
 const WebSocket = require('ws');
+const { isAuthorizedApiKey } = require('./middleware/auth');
+const { getPersonnelMap, enrichWithCache } = require('./personnelCache');
+
 let wss = null;
 let lastKnownId = 0;
 let pollInterval = null;
 
-// Must match DEDUP_SECONDS in liveController.js
 const DEDUP_SECONDS = 30;
 
-function authorizedSql(fieldName) {
-  return `
-    ${fieldName} IS NOT NULL
-    AND LTRIM(RTRIM(CAST(${fieldName} AS NVARCHAR(255)))) NOT IN ('', '-', '0')
-    AND LOWER(LTRIM(RTRIM(CAST(${fieldName} AS NVARCHAR(255))))) NOT IN ('null', 'undefined')
-  `;
-}
-
 function initWebSocket(server) {
-  wss = new WebSocket.Server({ server });
+  wss = new WebSocket.Server({
+    server,
+    verifyClient: ({ req }, done) => {
+      try {
+        const requestUrl = new URL(req.url, 'http://localhost');
+        const apiKey = requestUrl.searchParams.get('apiKey');
+        if (isAuthorizedApiKey(apiKey)) {
+          return done(true);
+        }
+      } catch (_err) {}
+      return done(false, 401, 'Unauthorized');
+    },
+  });
   wss.on('connection', (ws) => {
     console.log('🔌 WebSocket client connected');
     ws.send(JSON.stringify({ type: 'connected', message: 'Live feed connected' }));
@@ -37,81 +43,53 @@ function broadcast(data) {
 function startPolling(queryFn) {
   if (pollInterval) clearInterval(pollInterval);
 
-  // Seed lastKnownId from the latest record in DB
-  queryFn(`SELECT TOP 1 CardRecordID FROM CardRecord ORDER BY CardRecordID DESC`)
+  queryFn(`SET NOCOUNT ON; SELECT TOP 1 CardRecordID FROM CardRecord WITH (NOLOCK) ORDER BY CardRecordID DESC`)
     .then((r) => { if (r.recordset.length > 0) lastKnownId = r.recordset[0].CardRecordID; })
-    .catch(() => { });
+    .catch(() => {});
 
   let isPolling = false;
   pollInterval = setInterval(async () => {
     if (isPolling) return;
     isPolling = true;
     try {
+      const personnelMap = await getPersonnelMap();
       const result = await queryFn(`
+        SET NOCOUNT ON;
         WITH NewRows AS (
           SELECT
-            c.CardRecordID,
-            c.CardData,
-            c.PName,
-            c.PCode,
-            c.DeptName,
-            c.EquptName,
-            p.Addr,
-            pe2.CarNumber,
-            p.PDesc AS Remark,
+            c.CardRecordID, c.CardData, c.PName, c.PCode, c.DeptName, c.EquptName, c.PersonnelID, c.PortNum,
             DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') AS ScanTime,
             ROW_NUMBER() OVER (
-              PARTITION BY
-                c.CardData,
-                CAST(c.DataTime * 86400 / ${DEDUP_SECONDS} AS BIGINT)
+              PARTITION BY c.CardData, c.PortNum, CAST(c.DataTime * 86400 / ${DEDUP_SECONDS} AS BIGINT)
               ORDER BY c.CardRecordID DESC
             ) AS rn
-          FROM CardRecord c
-          LEFT JOIN Personnel p ON p.PersonnelID = c.PersonnelID
-          LEFT JOIN PersonnelExtend2 pe2 ON pe2.PersonnelID = c.PersonnelID
+          FROM CardRecord c WITH (NOLOCK)
           WHERE c.CardRecordID > ${lastKnownId}
-            AND ${authorizedSql('c.PCode')}
         )
-        SELECT TOP 50
-          CardRecordID, CardData, PName, PCode, DeptName, EquptName, Addr, CarNumber, Remark, ScanTime
+        SELECT TOP 50 *
         FROM NewRows
         WHERE rn = 1
         ORDER BY CardRecordID ASC
       `);
 
       if (result.recordset.length > 0) {
-        const newRecords = result.recordset.map(enrichRecord);
-
-        // Advance lastKnownId to the absolute max including dupes we filtered out
-        const maxIdResult = await queryFn(
-          `SELECT MAX(CardRecordID) AS MaxId FROM CardRecord WHERE CardRecordID > ${lastKnownId}`
-        );
+        const newRecords = result.recordset.map(r => enrichWithCache(r, personnelMap));
+        const maxIdResult = await queryFn(`SELECT MAX(CardRecordID) AS MaxId FROM CardRecord WHERE CardRecordID > ${lastKnownId}`);
         const maxId = maxIdResult.recordset[0]?.MaxId;
         if (maxId) lastKnownId = maxId;
 
         broadcast({ type: 'new_scans', data: newRecords });
-        console.log(`📡 Broadcasted ${newRecords.length} deduped records (lastId=${lastKnownId})`);
+        console.log(`📡 Broadcasted ${newRecords.length} records (lastId=${lastKnownId})`);
       }
     } catch (_err) {
-      // DB unavailable — skip tick silently
     } finally {
       isPolling = false;
     }
   }, 3000);
 }
 
-function enrichRecord(record) {
-  const remark = record.Remark == null ? '' : record.Remark.toString().trim().toUpperCase();
-  const vehicleType = remark === '2W' || remark === '4W' ? remark : null;
-  return {
-    ...record,
-    flatNumber: record.Addr || null,
-    vehicleType,
-  };
-}
-
 function stopPolling() {
   if (pollInterval) clearInterval(pollInterval);
 }
 
-module.exports = { initWebSocket, broadcast, startPolling, stopPolling, enrichRecord };
+module.exports = { initWebSocket, broadcast, startPolling, stopPolling, enrichWithCache };

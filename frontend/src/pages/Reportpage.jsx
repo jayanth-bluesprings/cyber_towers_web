@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import Navbar from '../components/Navbar.jsx';
 
 const API = '/api';
-const DEFAULT_FILTERS = { from: '', to: '', type: '', search: '', status: '' };
+const DEFAULT_FILTERS = { from: '', to: '', type: '', search: '', status: '', authorization: '' };
 const QUICK_RANGES = [
   { key: 'today', label: 'Today' },
   { key: 'week', label: 'Week' },
@@ -31,7 +31,7 @@ function buildDownloadUrl(filters) {
 }
 
 function formatDateTime(value) {
-  if (!value) return 'Still Inside';
+  if (!value) return '-';
   const raw = String(value).trim();
   const normalized = raw.endsWith('Z') ? raw.slice(0, -1) : raw;
   const date = new Date(normalized);
@@ -76,6 +76,23 @@ function sanitize(value) {
   if (value == null) return '-';
   const text = String(value).trim();
   return text && text !== '-' ? text : '-';
+}
+
+function getAuthorizationBadge(pcode) {
+  const value = String(pcode ?? '').trim();
+  const normalized = value.toLowerCase();
+  const authorized = normalized === 'authorized' ? true : normalized === 'unauthorized' ? false : value !== '' && value !== '-';
+  return authorized
+    ? {
+        label: 'Authorized',
+        className:
+          'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+      }
+    : {
+        label: 'Unauthorized',
+        className:
+          'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+      };
 }
 
 function formatInputDate(date) {
@@ -172,19 +189,21 @@ async function exportReportPdf(filters) {
   const records = payload?.data?.records ?? [];
   const logoUrl = `${window.location.origin}/logo.png`;
 
-  const rowsHtml = records.map((row) => `
+  const rowsHtml = records.map((row) => {
+    const auth = getAuthorizationBadge(row.Authorization ?? row.PCode);
+    return `
     <tr>
       <td>${sanitize(row.CardData)}</td>
       <td>${sanitize(row.PName)}</td>
       <td>${sanitize(row.Addr)}</td>
-      <td>${sanitize(row.PCode)}</td>
+      <td><span class="${auth.className}">${auth.label}</span></td>
       <td>${sanitize(row.VehicleType)}</td>
       <td>${formatDateTime(row.EntryTime)}</td>
       <td>${formatDateTime(row.ExitTime)}</td>
       <td>${formatDuration(row.EntryTime, row.ExitTime)}</td>
       <td>${sanitize(row.Status)}</td>
     </tr>
-  `).join('');
+  `; }).join('');
 
   const printWindow = window.open('', '_blank', 'width=1200,height=800');
   if (!printWindow) return;
@@ -221,9 +240,9 @@ async function exportReportPdf(filters) {
           <thead>
             <tr>
               <th>Card ID</th>
-              <th>Name</th>
-              <th>Flat</th>
-              <th>Access Code</th>
+              <th>Vehcile No.</th>
+              <th>Company Name</th>
+              <th>Authorization</th>
               <th>Type</th>
               <th>Entry Time</th>
               <th>Exit Time</th>
@@ -340,7 +359,7 @@ export default function ReportPage({ dark, setDark, onNavigate, onLogout, active
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-slate-400">Filter Report</p>
+          <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-400">Filter Report</p>
           <div className="mb-3 flex flex-wrap gap-2">
             {QUICK_RANGES.map((range) => (
               <button
@@ -357,9 +376,9 @@ export default function ReportPage({ dark, setDark, onNavigate, onLogout, active
               </button>
             ))}
           </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-500">From</label>
+              <label className="text-xs font-bold text-slate-500">From</label>
               <input
                 type="date"
                 value={filters.from}
@@ -373,7 +392,7 @@ export default function ReportPage({ dark, setDark, onNavigate, onLogout, active
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-500">To</label>
+              <label className="text-xs font-bold text-slate-500">To</label>
               <input
                 type="date"
                 value={filters.to}
@@ -387,7 +406,7 @@ export default function ReportPage({ dark, setDark, onNavigate, onLogout, active
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-500">Type</label>
+              <label className="text-xs font-bold text-slate-500">Type</label>
               <select
                 value={filters.type}
                 onChange={(event) => {
@@ -403,7 +422,7 @@ export default function ReportPage({ dark, setDark, onNavigate, onLogout, active
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-500">Status</label>
+              <label className="text-xs font-bold text-slate-500">Status</label>
               <select
                 value={filters.status}
                 onChange={(event) => {
@@ -419,11 +438,27 @@ export default function ReportPage({ dark, setDark, onNavigate, onLogout, active
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-500">Search</label>
+              <label className="text-xs font-bold text-slate-500">Authorization</label>
+              <select
+                value={filters.authorization}
+                onChange={(event) => {
+                  setPage(1);
+                  setFilters((prev) => ({ ...prev, authorization: event.target.value }));
+                }}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-sky-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+              >
+                <option value="">All Types</option>
+                <option value="Authorized">Authorized</option>
+                <option value="Unauthorized">Unauthorized</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-500">Search</label>
               <input
                 type="text"
                 value={filters.search}
-                placeholder="Card, name, flat, code"
+                placeholder="Card, Vehcile No., Company Name, code"
                 onChange={(event) => {
                   setPage(1);
                   setFilters((prev) => ({ ...prev, search: event.target.value }));
@@ -469,7 +504,7 @@ export default function ReportPage({ dark, setDark, onNavigate, onLogout, active
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-950/50">
-                  {['Card ID', 'Name', 'Flat', 'Access Code', 'Type', 'Entry Time', 'Exit Time', 'Duration', 'Status'].map((heading) => (
+                  {['Card ID', 'Vehcile No.', 'Company Name', 'Authorization', 'Vehicle Type', 'Entry Time', 'Exit Time', 'Duration', 'Status'].map((heading) => (
                     <th
                       key={heading}
                       className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
@@ -511,8 +546,11 @@ export default function ReportPage({ dark, setDark, onNavigate, onLogout, active
                       <td className="whitespace-nowrap px-4 py-3 text-slate-700 dark:text-slate-200">
                         {sanitize(row.Addr)}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-500 dark:text-slate-300">
-                        {sanitize(row.PCode)}
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {(() => {
+                          const auth = getAuthorizationBadge(row.Authorization ?? row.PCode);
+                          return <span className={auth.className}>{auth.label}</span>;
+                        })()}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${

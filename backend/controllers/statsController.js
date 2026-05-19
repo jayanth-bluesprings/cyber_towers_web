@@ -1,11 +1,26 @@
 const { query } = require('../db');
 const path = require('path');
 const fs = require('fs');
+const { getPersonnelMap, enrichWithCache } = require('../personnelCache');
 
-const DEDUP_SECONDS = 30;
+const DEDUP_SECONDS = 60; // Must match frontend DEDUP_SECONDS in LiveEntryExitPage.jsx / LiveTable.jsx
 
-// Edit vehicleTypeMap.json (same folder as this file) to classify cards:
-// { "11528938": "2W", "11528937": "4W" }
+function deduplicateRecords(records) {
+  const seen = new Map();
+  const deduped = [];
+  const sorted = [...records].sort((a, b) => b.DataTime - a.DataTime);
+  for (const r of sorted) {
+    const bucket = Math.floor((r.DataTime * 86400) / DEDUP_SECONDS);
+    // Include PortNum so that entry + exit of the same card within 60 s are kept as 2 events
+    const key = `${String(r.CardData || '').toUpperCase()}|${bucket}|${r.PortNum ?? ''}`;
+    if (!seen.has(key)) {
+      seen.set(key, true);
+      deduped.push(r);
+    }
+  }
+  return deduped.reverse();
+}
+
 function getTypeMap() {
   try {
     const filePath = path.join(__dirname, 'vehicleTypeMap.json');
@@ -17,36 +32,16 @@ function getTypeMap() {
   }
 }
 
-function dedupCTE(since) {
-  return `
-    WITH Deduped AS (
-      SELECT
-        c.CardData,
-        c.PCode,
-        p.PDesc AS Remark,
-        c.PortNum,
-        DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') AS ScanTime,
-        ROW_NUMBER() OVER (
-          PARTITION BY
-            c.CardData,
-            CAST(c.DataTime * 86400 / ${DEDUP_SECONDS} AS BIGINT)
-          ORDER BY c.CardRecordID DESC
-        ) AS rn
-      FROM CardRecord c
-      LEFT JOIN Personnel p ON p.PersonnelID = c.PersonnelID
-      WHERE DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') >= ${since}
-    )
-  `;
-}
+function getVehicleType(record) {
+  const raw = record.vehicleType || record.Remark || '';
+  const remarkType = String(raw).trim().toUpperCase();
+  if (!remarkType) return null;
 
-function isAuthorizedPCode(value) {
-  const pcode = value == null ? '' : String(value).trim().toLowerCase();
-  return !['', '-', '0', 'null', 'undefined'].includes(pcode);
-}
-
-function getVehicleType(record, typeMap) {
-  const remarkType = record.Remark == null ? '' : String(record.Remark).trim().toUpperCase();
-  if (remarkType === '2W' || remarkType === '4W') return remarkType;
+  // Normalize common remark forms from PDesc / vehicleType cache
+  const startsWith2 = remarkType.startsWith('2');
+  const startsWith4 = remarkType.startsWith('4');
+  if (startsWith2 || remarkType.includes('2W') || remarkType.includes('TWO')) return '2W';
+  if (startsWith4 || remarkType.includes('4W') || remarkType.includes('FOUR')) return '4W';
   return null;
 }
 
@@ -61,284 +56,203 @@ function getLocalTimeWindows() {
   const nowIstMs = nowUtc.getTime() + (IST_OFFSET_MINUTES * 60 * 1000);
   const nowIst = new Date(nowIstMs);
 
-  const dayStart = new Date(
-    nowIst.getUTCFullYear(),
-    nowIst.getUTCMonth(),
-    nowIst.getUTCDate(),
-    0, 0, 0
-  );
-  const nextDayStart = new Date(
-    nowIst.getUTCFullYear(),
-    nowIst.getUTCMonth(),
-    nowIst.getUTCDate() + 1,
-    0, 0, 0
-  );
-  const weekStart = new Date(
-    nowIst.getUTCFullYear(),
-    nowIst.getUTCMonth(),
-    nowIst.getUTCDate() - 6,
-    0, 0, 0
-  );
-  const monthStart = new Date(
-    nowIst.getUTCFullYear(),
-    nowIst.getUTCMonth(),
-    nowIst.getUTCDate() - 29,
-    0, 0, 0
-  );
+  const dayStart = new Date(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate(), 0, 0, 0);
+  const nextDayStart = new Date(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate() + 1, 0, 0, 0);
+  const weekStart = new Date(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate() - 6, 0, 0, 0);
+  const monthStart = new Date(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate() - 29, 0, 0, 0);
+
+  const baseDate = Date.UTC(1899, 11, 30, 0, 0, 0);
+  const toFloat = (d) => (Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes(), d.getSeconds()) - baseDate) / (24 * 60 * 60 * 1000);
 
   return {
     dayStartSql: formatSqlDateTime(dayStart),
+    dayStartFloat: toFloat(dayStart),
     nextDayStartSql: formatSqlDateTime(nextDayStart),
+    nextDayStartFloat: toFloat(nextDayStart),
     weekStartSql: formatSqlDateTime(weekStart),
+    weekStartFloat: toFloat(weekStart),
     monthStartSql: formatSqlDateTime(monthStart),
+    monthStartFloat: toFloat(monthStart),
   };
 }
 
 async function getVehicleStats(req, res) {
   try {
     const period = String(req.query.period || 'day').toLowerCase();
-    const { dayStartSql, nextDayStartSql, weekStartSql, monthStartSql } = getLocalTimeWindows();
+    const times = getLocalTimeWindows();
+    const rangeStartFloat = period === 'week' ? times.weekStartFloat : period === 'month' ? times.monthStartFloat : times.dayStartFloat;
+    const rangeEndFloat = period === 'day' ? times.nextDayStartFloat : null;
 
-    const rangeStartSql = period === 'week' ? weekStartSql : period === 'month' ? monthStartSql : dayStartSql;
-    const rangeEndSql = period === 'day' ? nextDayStartSql : null;
-
+    const personnelMap = await getPersonnelMap();
     const result = await query(`
-      WITH Deduped AS (
-        SELECT
-          c.CardData,
-          c.PCode,
-          p.PDesc AS Remark,
-          c.EquptName,
-          DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') AS ScanTime,
-          ROW_NUMBER() OVER (
-            PARTITION BY
-              c.CardData,
-              CAST(c.DataTime * 86400 / ${DEDUP_SECONDS} AS BIGINT)
-            ORDER BY c.CardRecordID DESC
-          ) AS rn
-        FROM CardRecord c
-        LEFT JOIN Personnel p ON p.PersonnelID = c.PersonnelID
-        WHERE DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') >= '${rangeStartSql}'
-        ${rangeEndSql ? `AND DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') < '${rangeEndSql}'` : ''}
-      )
+      SET NOCOUNT ON;
       SELECT
-        ScanTime,
-        DATEPART(HOUR, ScanTime) AS ScanHour,
-        CONVERT(VARCHAR(10), ScanTime, 23) AS ScanDay,
-        PCode,
-        Remark,
+        c.CardData, c.DataTime, c.PCode, c.PersonnelID,
         CASE
-          WHEN LTRIM(RTRIM(EquptName)) = '24074151 - 1' THEN 'Entry'
-          WHEN LTRIM(RTRIM(EquptName)) = '24074151 - 2' THEN 'Exit'
-          WHEN LOWER(EquptName) LIKE '%entry%' OR LOWER(EquptName) = 'in' THEN 'Entry'
-          WHEN LOWER(EquptName) LIKE '%exit%' OR LOWER(EquptName) = 'out' THEN 'Exit'
+          WHEN c.PortNum = 1 THEN 'Entry'
+          WHEN c.PortNum = 2 THEN 'Exit'
           ELSE 'Unknown'
         END AS GateDirection
-      FROM Deduped
-      WHERE rn = 1
-    `);
+      FROM CardRecord c WITH (NOLOCK)
+      WHERE c.DataTime >= @rangeStartFloat
+        ${rangeEndFloat ? `AND c.DataTime < @rangeEndFloat` : ''}
+    `, { rangeStartFloat, rangeEndFloat });
+
+    const rawRecords = deduplicateRecords(result.recordset);
+
+    const processed = rawRecords.map((r) => {
+      const p = personnelMap.get(r.PersonnelID) || personnelMap.get(String(r.CardData)) || {};
+      const scanTime = new Date(r.DataTime * 86400 * 1000 + new Date('1899-12-30').getTime());
+      const vehicleType = getVehicleType({ vehicleType: p.vehicleType, Remark: p.Remark || r.Remark || '' });
+      return {
+        ...r,
+        ScanTime: scanTime,
+        ScanHour: scanTime.getUTCHours(),
+        ScanDay: scanTime.toISOString().slice(0, 10),
+        Remark: p.Remark || r.Remark || '',
+        vehicleType,
+      };
+    });
 
     if (period === 'day') {
       const byHour = new Map();
-      for (let hour = 0; hour < 24; hour += 1) {
-        byHour.set(hour, {
-          Hour: hour,
-          Entry: 0,
-          Exit: 0,
-          Total: 0,
-          TwoWheelerEntry: 0,
-          TwoWheelerExit: 0,
-          FourWheelerEntry: 0,
-          FourWheelerExit: 0,
+      for (let i = 0; i < 24; i++) {
+        byHour.set(i, {
+          entry: 0,
+          exit: 0,
+          twoWheelerEntry: 0,
+          twoWheelerExit: 0,
+          fourWheelerEntry: 0,
+          fourWheelerExit: 0,
         });
       }
-
-      for (const row of result.recordset) {
-        if (!isAuthorizedPCode(row.PCode)) continue;
-        const bucket = byHour.get(Number(row.ScanHour));
-        if (!bucket) continue;
-        const remark = row.Remark == null ? '' : String(row.Remark).trim().toUpperCase();
-        if (row.GateDirection === 'Entry') bucket.Entry += 1;
-        if (row.GateDirection === 'Exit') bucket.Exit += 1;
-        if (row.GateDirection === 'Entry' || row.GateDirection === 'Exit') bucket.Total += 1;
-        if (remark === '2W' && row.GateDirection === 'Entry') bucket.TwoWheelerEntry += 1;
-        if (remark === '2W' && row.GateDirection === 'Exit') bucket.TwoWheelerExit += 1;
-        if (remark === '4W' && row.GateDirection === 'Entry') bucket.FourWheelerEntry += 1;
-        if (remark === '4W' && row.GateDirection === 'Exit') bucket.FourWheelerExit += 1;
+      for (const r of processed) {
+        const h = r.ScanHour;
+        if (byHour.has(h)) {
+          const bucket = byHour.get(h);
+          if (r.GateDirection === 'Entry') {
+            bucket.entry++;
+            if (r.vehicleType === '2W') bucket.twoWheelerEntry++;
+            else if (r.vehicleType === '4W') bucket.fourWheelerEntry++;
+          } else if (r.GateDirection === 'Exit') {
+            bucket.exit++;
+            if (r.vehicleType === '2W') bucket.twoWheelerExit++;
+            else if (r.vehicleType === '4W') bucket.fourWheelerExit++;
+          }
+        }
       }
-
-      res.json({ success: true, data: Array.from(byHour.values()) });
-      return;
+      return res.json({ success: true, data: Array.from(byHour.entries()).map(([hour, counts]) => ({ hour, ...counts })) });
+    } else {
+      const byDay = new Map();
+      for (const r of processed) {
+        const d = r.ScanDay;
+        if (!byDay.has(d)) {
+          byDay.set(d, {
+            entry: 0,
+            exit: 0,
+            twoWheelerEntry: 0,
+            twoWheelerExit: 0,
+            fourWheelerEntry: 0,
+            fourWheelerExit: 0,
+          });
+        }
+        const bucket = byDay.get(d);
+        if (r.GateDirection === 'Entry') {
+          bucket.entry++;
+          if (r.vehicleType === '2W') bucket.twoWheelerEntry++;
+          else if (r.vehicleType === '4W') bucket.fourWheelerEntry++;
+        } else if (r.GateDirection === 'Exit') {
+          bucket.exit++;
+          if (r.vehicleType === '2W') bucket.twoWheelerExit++;
+          else if (r.vehicleType === '4W') bucket.fourWheelerExit++;
+        }
+      }
+      return res.json({ success: true, data: Array.from(byDay.entries()).map(([date, counts]) => ({ date, ...counts })).sort((a, b) => a.date.localeCompare(b.date)) });
     }
-
-    const daysToShow = period === 'week' ? 7 : 30;
-    const byDay = new Map();
-    const startDate = new Date(period === 'week' ? weekStartSql.replace(' ', 'T') : monthStartSql.replace(' ', 'T'));
-    for (let i = 0; i < daysToShow; i += 1) {
-      const d = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i);
-      const key = formatSqlDateTime(d).slice(0, 10);
-      byDay.set(key, {
-        Day: key,
-        Entry: 0,
-        Exit: 0,
-        Total: 0,
-        TwoWheelerEntry: 0,
-        TwoWheelerExit: 0,
-        FourWheelerEntry: 0,
-        FourWheelerExit: 0,
-      });
-    }
-
-    for (const row of result.recordset) {
-      if (!isAuthorizedPCode(row.PCode)) continue;
-      const key = String(row.ScanDay || '');
-      const bucket = byDay.get(key);
-      if (!bucket) continue;
-      const remark = row.Remark == null ? '' : String(row.Remark).trim().toUpperCase();
-      if (row.GateDirection === 'Entry') bucket.Entry += 1;
-      if (row.GateDirection === 'Exit') bucket.Exit += 1;
-      if (row.GateDirection === 'Entry' || row.GateDirection === 'Exit') bucket.Total += 1;
-      if (remark === '2W' && row.GateDirection === 'Entry') bucket.TwoWheelerEntry += 1;
-      if (remark === '2W' && row.GateDirection === 'Exit') bucket.TwoWheelerExit += 1;
-      if (remark === '4W' && row.GateDirection === 'Entry') bucket.FourWheelerEntry += 1;
-      if (remark === '4W' && row.GateDirection === 'Exit') bucket.FourWheelerExit += 1;
-    }
-
-    res.json({ success: true, data: Array.from(byDay.values()) });
   } catch (err) {
-    console.error('getVehicleStats error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 }
 
 async function getVehicleTypeCount(req, res) {
   try {
-    const typeMap = getTypeMap();
-    const { monthStartSql } = getLocalTimeWindows();
-
+    const personnelMap = await getPersonnelMap();
+    const { monthStartFloat } = getLocalTimeWindows();
     const result = await query(`
-      ${dedupCTE(`'${monthStartSql}'`)}
-      , LatestPerCard AS (
-        SELECT
-          CardData,
-          PCode,
-          Remark,
-          ROW_NUMBER() OVER (
-            PARTITION BY CardData
-            ORDER BY ScanTime DESC
-          ) AS card_rn
-        FROM Deduped
-        WHERE rn = 1
-      )
-      SELECT CardData, PCode, Remark
-      FROM LatestPerCard
-      WHERE card_rn = 1
-    `);
+      SET NOCOUNT ON;
+      SELECT c.CardData, c.DataTime, c.PCode, c.PersonnelID
+      FROM CardRecord c WITH (NOLOCK)
+      WHERE c.DataTime >= @monthStartFloat
+    `, { monthStartFloat });
 
     let twoWheeler = 0, fourWheeler = 0, total = 0;
-    for (const r of result.recordset) {
-      if (!isAuthorizedPCode(r.PCode)) continue;
+    const rawRecords = deduplicateRecords(result.recordset);
+    const uniqueCards = new Set();
+    for (const r of rawRecords) {
+      if (uniqueCards.has(r.CardData)) continue;
+      uniqueCards.add(r.CardData);
       total++;
-      const t = getVehicleType(r, typeMap);
-      if (t === '2W') twoWheeler++;
-      else if (t === '4W') fourWheeler++;
+      const p = personnelMap.get(r.PersonnelID) || personnelMap.get(String(r.CardData)) || {};
+      const type = getVehicleType({ vehicleType: p.vehicleType, Remark: p.Remark });
+      if (type === '2W') twoWheeler++;
+      else if (type === '4W') fourWheeler++;
     }
-
     res.json({ success: true, data: { twoWheeler, fourWheeler, total } });
   } catch (err) {
-    console.error('getVehicleTypeCount error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 }
 
 async function getVehicleCount(req, res) {
   try {
-    const typeMap = getTypeMap();
-    const { dayStartSql, weekStartSql, monthStartSql } = getLocalTimeWindows();
-
+    const t = getLocalTimeWindows();
+    const personnelMap = await getPersonnelMap();
     const result = await query(`
-      WITH Deduped AS (
-        SELECT
-          c.CardData,
-          c.PCode,
-          p.PDesc AS Remark,
-          c.EquptName,
-          c.PortNum,
-          DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') AS ScanTime,
-          ROW_NUMBER() OVER (
-            PARTITION BY
-              c.CardData,
-              CAST(c.DataTime * 86400 / ${DEDUP_SECONDS} AS BIGINT)
-            ORDER BY c.CardRecordID DESC
-          ) AS rn
-        FROM CardRecord c
-        LEFT JOIN Personnel p ON p.PersonnelID = c.PersonnelID
-        WHERE DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') >= '${monthStartSql}'
-      )
+      SET NOCOUNT ON;
       SELECT
-        CardData,
-        PCode,
-        Remark,
-        EquptName,
-        PortNum,
+        c.CardData, c.PCode, c.PersonnelID, c.DataTime,
         CASE
-          WHEN LTRIM(RTRIM(EquptName)) = '24074151 - 1' THEN 'Entry'
-          WHEN LTRIM(RTRIM(EquptName)) = '24074151 - 2' THEN 'Exit'
-          WHEN LOWER(EquptName) LIKE '%entry%' OR LOWER(EquptName) = 'in' THEN 'Entry'
-          WHEN LOWER(EquptName) LIKE '%exit%' OR LOWER(EquptName) = 'out' THEN 'Exit'
-          WHEN PortNum = 1 THEN 'Entry'
-          WHEN PortNum = 2 THEN 'Exit'
+          WHEN c.PortNum = 1 THEN 'Entry'
+          WHEN c.PortNum = 2 THEN 'Exit'
           ELSE 'Unknown'
-        END AS GateDirection,
-        CASE WHEN ScanTime >= '${dayStartSql}' THEN 1 ELSE 0 END AS InDay,
-        CASE WHEN ScanTime >= '${weekStartSql}' THEN 1 ELSE 0 END AS InWeek
-      FROM Deduped
-      WHERE rn = 1
-    `);
+        END AS GateDirection
+      FROM CardRecord c WITH (NOLOCK)
+      WHERE c.DataTime >= @monthStartFloat
+    `, { monthStartFloat: t.monthStartFloat });
 
-    const all = result.recordset;
-
-    function stats(rows) {
-      let total = rows.length, twoWheeler = 0, fourWheeler = 0;
-      let entry = 0, exit = 0;
-      let twoWheelerEntry = 0, twoWheelerExit = 0;
-      let fourWheelerEntry = 0, fourWheelerExit = 0;
-      for (const r of rows) {
-        if (!isAuthorizedPCode(r.PCode)) continue;
-        const t = getVehicleType(r, typeMap);
-        if (t === '2W') {
-          twoWheeler++;
-          if (r.GateDirection === 'Entry') twoWheelerEntry++;
-          if (r.GateDirection === 'Exit') twoWheelerExit++;
-        } else if (t === '4W') {
-          fourWheeler++;
-          if (r.GateDirection === 'Entry') fourWheelerEntry++;
-          if (r.GateDirection === 'Exit') fourWheelerExit++;
+    const all = deduplicateRecords(result.recordset);
+    const process = (recs) => {
+      const unique = new Set();
+      let entry = 0, exit = 0, twoWheeler = 0, fourWheeler = 0, twoWheelerEntry = 0, twoWheelerExit = 0, fourWheelerEntry = 0, fourWheelerExit = 0;
+      for (const r of recs) {
+        const p = personnelMap.get(r.PersonnelID) || personnelMap.get(String(r.CardData)) || {};
+        const type = getVehicleType({ vehicleType: p.vehicleType, Remark: p.Remark });
+        
+        if (r.GateDirection === 'Entry') {
+          entry++;
+          if (type === '2W') twoWheelerEntry++;
+          else if (type === '4W') fourWheelerEntry++;
+        } else if (r.GateDirection === 'Exit') {
+          exit++;
+          if (type === '2W') twoWheelerExit++;
+          else if (type === '4W') fourWheelerExit++;
         }
-        if (r.GateDirection === 'Entry') entry++;
-        if (r.GateDirection === 'Exit') exit++;
+        if (!unique.has(r.CardData)) {
+          unique.add(r.CardData);
+          if (type === '2W') twoWheeler++;
+          else if (type === '4W') fourWheeler++;
+        }
       }
-      total = entry + exit;
-      return {
-        total,
-        twoWheeler,
-        fourWheeler,
-        entry,
-        exit,
-        twoWheelerEntry,
-        twoWheelerExit,
-        fourWheelerEntry,
-        fourWheelerExit,
-      };
-    }
+      return { total: unique.size, entry, exit, twoWheeler, fourWheeler, twoWheelerEntry, twoWheelerExit, fourWheelerEntry, fourWheelerExit };
+    };
 
     res.json({
       success: true,
       data: {
-        day:   stats(all.filter(r => r.InDay  === 1)),
-        week:  stats(all.filter(r => r.InWeek === 1)),
-        month: stats(all),
-      },
+        day: process(all.filter(r => r.DataTime >= t.dayStartFloat)),
+        week: process(all.filter(r => r.DataTime >= t.weekStartFloat)),
+        month: process(all)
+      }
     });
   } catch (err) {
     console.error('getVehicleCount error:', err.message);
@@ -346,4 +260,37 @@ async function getVehicleCount(req, res) {
   }
 }
 
-module.exports = { getVehicleStats, getVehicleTypeCount, getVehicleCount };
+async function getEventCounts(req, res) {
+  try {
+    const { dayStartFloat, nextDayStartFloat } = getLocalTimeWindows();
+
+    // Today's RFID read count
+    const rfidResult = await query(`
+      SET NOCOUNT ON;
+      SELECT COUNT(*) AS cnt FROM CardRecord WITH (NOLOCK)
+      WHERE DataTime >= @dayStartFloat AND DataTime < @nextDayStartFloat
+    `, { dayStartFloat, nextDayStartFloat });
+    const rfidCount = rfidResult.recordset[0].cnt;
+
+    // Today's traffic light event count — graceful fallback if table not yet configured
+    let lightCount = null;
+    try {
+      const lightResult = await query(`
+        SET NOCOUNT ON;
+        SELECT COUNT(*) AS cnt FROM OutputRecord WITH (NOLOCK)
+        WHERE DataTime >= @dayStartFloat AND DataTime < @nextDayStartFloat
+      `, { dayStartFloat, nextDayStartFloat });
+      lightCount = lightResult.recordset[0].cnt;
+    } catch {
+      lightCount = null; // Table not configured yet
+    }
+
+    const mismatch = lightCount !== null ? Math.max(0, rfidCount - lightCount) : null;
+
+    res.json({ success: true, data: { rfidCount, lightCount, mismatch } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+module.exports = { getVehicleStats, getVehicleTypeCount, getVehicleCount, getLocalTimeWindows, getEventCounts };

@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const { getLive, getNew, search, getAuthorizedVehicles } = require('../controllers/liveController');
-const { getVehicleStats, getVehicleTypeCount, getVehicleCount } = require('../controllers/statsController');
-const { getDebug, getReportSummary, getReportRecords, getVehicleOccupancy } = require('../controllers/reportController');
+const { getVehicleStats, getVehicleTypeCount, getVehicleCount, getEventCounts } = require('../controllers/statsController');
+const { getDebug, getReportSummary, getReportRecords, getVehicleOccupancy, trigger24hAlert } = require('../controllers/reportcontroller');
 
 router.get('/live', getLive);
 router.get('/new', getNew);
@@ -15,5 +15,7 @@ router.get('/report/debug', getDebug);
 router.get('/report/summary', getReportSummary);
 router.get('/report/records', getReportRecords);
 router.get('/report/occupancy', getVehicleOccupancy);
+router.get('/alerts/trigger-24h', trigger24hAlert);
+router.get('/health/events', getEventCounts);
 
 module.exports = router;

@@ -1,0 +1,37 @@
+[
+  {
+    "CardRecordID": "12194",
+    "CardData": "15986931",
+    "EquptName": "14070001 - 1",
+    "PortNum": 2,
+    "DataTime": 46112.6974189815
+  },
+  {
+    "CardRecordID": "12192",
+    "CardData": "15196646",
+    "EquptName": "14070001 - 1",
+    "PortNum": 2,
+    "DataTime": 46112.6974189815
+  },
+  {
+    "CardRecordID": "12191",
+    "CardData": "15196646",
+    "EquptName": "14070001 - 1",
+    "PortNum": 2,
+    "DataTime": 46112.6974074074
+  },
+  {
+    "CardRecordID": "12190",
+    "CardData": "1572865",
+    "EquptName": "14070001 - 1",
+    "PortNum": 2,
+    "DataTime": 46112.6969328704
+  },
+  {
+    "CardRecordID": "12186",
+    "CardData": "1572865",
+    "EquptName": "14070001 - 1",
+    "PortNum": 2,
+    "DataTime": 46112.6969212963
+  }
+]

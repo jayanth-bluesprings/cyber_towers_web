@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard.jsx';
 import ReportPage from './pages/Reportpage.jsx';
-import AuthorizedVehiclesPage from './pages/AuthorizedVehiclesPage.jsx';
+import LiveEntryExitPage from './pages/LiveEntryExitPage.jsx';
+import ConfigPage from './pages/ConfigPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 
 const AUTH_STORAGE_KEY = 'vehicleAccessAuth';
@@ -28,16 +29,20 @@ export default function App() {
   function navigateByPage(pageKey) {
     const nextPath = pageKey === 'report'
       ? '/report'
-      : pageKey === 'authorized'
-        ? '/authorized'
+      : pageKey === 'config'
+        ? '/config'
+      : pageKey === 'live'
+        ? '/live'
         : '/';
     navigate(nextPath);
   }
 
   const activePage = location.pathname === '/report'
     ? 'report'
-    : location.pathname === '/authorized'
-      ? 'authorized'
+    : location.pathname === '/config'
+      ? 'config'
+    : location.pathname === '/live'
+      ? 'live'
       : 'dashboard';
 
   function handleLogin(username, password) {
@@ -91,10 +96,23 @@ export default function App() {
           />
         }
       />
+      <Route path="/authorized" element={<Navigate to="/config" replace />} />
       <Route
-        path="/authorized"
+        path="/live"
         element={
-          <AuthorizedVehiclesPage
+          <LiveEntryExitPage
+            dark={dark}
+            setDark={setDark}
+            onNavigate={navigateByPage}
+            onLogout={handleLogout}
+            activePage={activePage}
+          />
+        }
+      />
+      <Route
+        path="/config"
+        element={
+          <ConfigPage
             dark={dark}
             setDark={setDark}
             onNavigate={navigateByPage}

@@ -42,6 +42,20 @@ export default function VehicleChart({ period }) {
   });
 
   const stats = statsData?.data || [];
+  const normalizedStats = stats.map((bucket) => {
+    const hour = bucket.hour ?? bucket.Hour ?? null;
+    const day = bucket.day ?? bucket.Day ?? bucket.date ?? null;
+    return {
+      hour,
+      day,
+      entry: bucket.entry ?? bucket.Entry ?? 0,
+      exit: bucket.exit ?? bucket.Exit ?? 0,
+      twoWheelerEntry: bucket.twoWheelerEntry ?? bucket.TwoWheelerEntry ?? 0,
+      twoWheelerExit: bucket.twoWheelerExit ?? bucket.TwoWheelerExit ?? 0,
+      fourWheelerEntry: bucket.fourWheelerEntry ?? bucket.FourWheelerEntry ?? 0,
+      fourWheelerExit: bucket.fourWheelerExit ?? bucket.FourWheelerExit ?? 0,
+    };
+  });
   const types = typeData?.data || {};
 
   const selectedTypes = ['2w', '4w'].filter((key) => filters[key]);
@@ -49,12 +63,12 @@ export default function VehicleChart({ period }) {
   const showAll = selectedTypes.length === 0 && selectedDirections.length === 0;
 
   function sumValues(bucket, typeKey, directionKey) {
-    if (typeKey === '2w' && directionKey === 'entry') return bucket.TwoWheelerEntry || 0;
-    if (typeKey === '2w' && directionKey === 'exit') return bucket.TwoWheelerExit || 0;
-    if (typeKey === '4w' && directionKey === 'entry') return bucket.FourWheelerEntry || 0;
-    if (typeKey === '4w' && directionKey === 'exit') return bucket.FourWheelerExit || 0;
-    if (!typeKey && directionKey === 'entry') return bucket.Entry || 0;
-    if (!typeKey && directionKey === 'exit') return bucket.Exit || 0;
+    if (typeKey === '2w' && directionKey === 'entry') return bucket.twoWheelerEntry || 0;
+    if (typeKey === '2w' && directionKey === 'exit') return bucket.twoWheelerExit || 0;
+    if (typeKey === '4w' && directionKey === 'entry') return bucket.fourWheelerEntry || 0;
+    if (typeKey === '4w' && directionKey === 'exit') return bucket.fourWheelerExit || 0;
+    if (!typeKey && directionKey === 'entry') return bucket.entry || 0;
+    if (!typeKey && directionKey === 'exit') return bucket.exit || 0;
     return 0;
   }
 
@@ -62,16 +76,30 @@ export default function VehicleChart({ period }) {
     if (showAll) {
       return [
         {
-          label: 'Entry',
-          data: stats.map((bucket) => bucket.Entry || 0),
-          backgroundColor: 'rgba(34, 197, 94, 0.8)',
+          label: '2W Entry',
+          data: normalizedStats.map((bucket) => bucket.twoWheelerEntry || 0),
+          backgroundColor: 'rgba(16, 185, 129, 0.85)',
           borderRadius: 4,
           stack: 'stack',
         },
         {
-          label: 'Exit',
-          data: stats.map((bucket) => bucket.Exit || 0),
-          backgroundColor: 'rgba(239, 68, 68, 0.8)',
+          label: '2W Exit',
+          data: normalizedStats.map((bucket) => bucket.twoWheelerExit || 0),
+          backgroundColor: 'rgba(245, 158, 11, 0.85)',
+          borderRadius: 4,
+          stack: 'stack',
+        },
+        {
+          label: '4W Entry',
+          data: normalizedStats.map((bucket) => bucket.fourWheelerEntry || 0),
+          backgroundColor: 'rgba(14, 165, 233, 0.85)',
+          borderRadius: 4,
+          stack: 'stack',
+        },
+        {
+          label: '4W Exit',
+          data: normalizedStats.map((bucket) => bucket.fourWheelerExit || 0),
+          backgroundColor: 'rgba(244, 63, 94, 0.85)',
           borderRadius: 4,
           stack: 'stack',
         },
@@ -81,12 +109,12 @@ export default function VehicleChart({ period }) {
     const typesToUse = selectedTypes.length > 0 ? selectedTypes : [null];
     const directionsToUse = selectedDirections.length > 0 ? selectedDirections : ['entry', 'exit'];
     const palette = {
-      'entry-all': 'rgba(34, 197, 94, 0.8)',
-      'exit-all': 'rgba(239, 68, 68, 0.8)',
-      'entry-2w': 'rgba(16, 185, 129, 0.8)',
-      'exit-2w': 'rgba(245, 158, 11, 0.8)',
-      'entry-4w': 'rgba(14, 165, 233, 0.8)',
-      'exit-4w': 'rgba(244, 63, 94, 0.8)',
+      'entry-all': 'rgba(34, 197, 94, 0.85)',
+      'exit-all': 'rgba(239, 68, 68, 0.85)',
+      'entry-2w': 'rgba(16, 185, 129, 0.85)',
+      'exit-2w': 'rgba(245, 158, 11, 0.85)',
+      'entry-4w': 'rgba(14, 165, 233, 0.85)',
+      'exit-4w': 'rgba(244, 63, 94, 0.85)',
     };
 
     const datasets = [];
@@ -98,8 +126,8 @@ export default function VehicleChart({ period }) {
         labelParts.push(directionKey === 'entry' ? 'Entry' : 'Exit');
         datasets.push({
           label: labelParts.join(' '),
-          data: stats.map((bucket) => sumValues(bucket, typeKey, directionKey)),
-          backgroundColor: palette[key],
+          data: normalizedStats.map((bucket) => sumValues(bucket, typeKey, directionKey)),
+          backgroundColor: palette[key] || 'rgba(99, 102, 241, 0.85)',
           borderRadius: 4,
           stack: 'stack',
         });
@@ -133,10 +161,12 @@ export default function VehicleChart({ period }) {
   }
 
   const barData = {
-    labels: stats.map((bucket) => (
+    labels: normalizedStats.map((bucket) => (
       period === 'day'
-        ? `${String(bucket.Hour).padStart(2, '0')}:00`
-        : new Date(`${bucket.Day}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+        ? `${String(bucket.hour ?? 0).padStart(2, '0')}:00`
+        : bucket.day
+          ? new Date(`${bucket.day}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+          : '-'
     )),
     datasets: buildDatasets(),
   };
@@ -184,12 +214,12 @@ export default function VehicleChart({ period }) {
   ];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <div className="card p-4 lg:col-span-2">
+    <div className="grid grid-cols-1 gap-4">
+      <div className="card p-4">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="font-display font-semibold text-base">Movement Graph</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">{getSubtitle()}</p>
+            <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">{getSubtitle()}</p>
           </div>
           <div className="flex gap-1 flex-wrap justify-end">
             {filterButtons.map((item) => (
@@ -199,7 +229,7 @@ export default function VehicleChart({ period }) {
                 className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors ${
                   filters[item.value]
                     ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
                 }`}
               >
                 {item.label}
@@ -211,11 +241,12 @@ export default function VehicleChart({ period }) {
           {stats.length > 0 ? (
             <Bar data={barData} options={barOptions} />
           ) : (
-            <div className="h-full flex items-center justify-center text-slate-400 text-sm">No data available</div>
+            <div className="h-full flex items-center justify-center text-slate-600 dark:text-slate-300 text-sm font-medium">No data available</div>
           )}
         </div>
       </div>
 
+      {/* 
       <div className="card p-4">
         <div className="mb-4">
           <h3 className="font-display font-semibold text-base">Vehicle Distribution</h3>
@@ -229,6 +260,7 @@ export default function VehicleChart({ period }) {
           )}
         </div>
       </div>
+      */}
     </div>
   );
 }

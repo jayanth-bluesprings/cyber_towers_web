@@ -29,6 +29,7 @@ npm start
 ```bash
 cd frontend
 npm install
+cp .env.example .env
 npm run dev
 ```
 
@@ -44,6 +45,19 @@ DB_DATABASE=TimeWatch
 DB_USER=sa
 DB_PASSWORD=yourpassword
 PORT=5000
+API_KEY=replace-with-a-long-random-secret
+ALLOWED_ORIGINS=http://localhost:3000,https://your-frontend-domain.com
+```
+
+`API_KEY` protects every `/api/*` route and the WebSocket feed. Send it as:
+- HTTP: `X-API-Key: your-secret`
+- WebSocket: `wss://api.yourdomain.com?apiKey=your-secret`
+
+## Environment Variables (frontend/.env)
+
+```bash
+VITE_API_URL=http://localhost:5000
+VITE_API_KEY=replace-with-the-same-api-key-as-backend
 ```
 
 ---
@@ -61,6 +75,22 @@ PORT=5000
 | GET | /health | Health check |
 
 ---
+
+## Public Access Setup
+
+Run the backend on the machine that can reach SQL Server, then expose only the backend through a tunnel or reverse proxy. The database stays private.
+
+Typical public URL:
+
+```text
+https://api.yourdomain.com/api/live
+```
+
+Recommended:
+- Keep SQL Server local/private
+- Expose Node/Express only
+- Set `API_KEY` before making the API public
+- Set `ALLOWED_ORIGINS` to your frontend domain(s)
 
 ## WebSocket
 

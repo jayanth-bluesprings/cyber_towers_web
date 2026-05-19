@@ -1,24 +1,23 @@
-const sql = require('mssql');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
+const sql = require('mssql');
 
 const config = {
-  server: process.env.DB_SERVER || 'localhost',
-  database: process.env.DB_DATABASE || 'TimeWatch',
-
-  user: process.env.DB_USER || 'sa',
-  password: process.env.DB_PASSWORD || 'YOUR_SA_PASSWORD',
-
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  server: process.env.DB_SERVER,
+  database: process.env.DB_DATABASE || process.env.DB_NAME,
+  port: parseInt(process.env.DB_PORT || '1433'),
   options: {
     encrypt: false,
-    trustServerCertificate: true
+    trustServerCertificate: true,
+    requestTimeout: 300000
   },
-
   pool: {
-    max: 10,
+    max: 50,
     min: 0,
     idleTimeoutMillis: 30000
-  }
+  },
 };
 
 let pool = null;
@@ -28,12 +27,9 @@ async function getPool() {
     try {
       pool = await sql.connect(config);
       console.log('✅ Connected to SQL Server successfully');
-      pool.on('error', (err) => {
-        console.error('SQL Pool error:', err);
-        pool = null;
-      });
     } catch (err) {
-      console.error('❌ Failed to connect to SQL Server:', err.message);
+      console.error('❌ SQL Connection Error:', err.message);
+      pool = null;
       throw err;
     }
   }
@@ -43,14 +39,26 @@ async function getPool() {
 async function query(queryString, params = {}) {
   const p = await getPool();
   const request = p.request();
-  for (const [key, value] of Object.entries(params)) {
-    if (typeof value === 'number') {
-      request.input(key, sql.Int, value);
-    } else {
-      request.input(key, sql.NVarChar, value);
+  
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      request.input(key, value);
     }
   }
-  return request.query(queryString);
+
+  const start = Date.now();
+  try {
+    // Prepend semicolon to ensure WITH clauses don't fail
+    const result = await request.query(`;${queryString}`);
+    const duration = Date.now() - start;
+    if (duration > 2000) {
+      console.log(`⚠️ Slow query (${duration}ms): ${queryString.substring(0, 100)}...`);
+    }
+    return result;
+  } catch (err) {
+    console.error(`❌ Query Error: ${err.message}\nQuery Summary: ${queryString.substring(0, 100)}`);
+    throw err;
+  }
 }
 
 module.exports = { getPool, query, sql };

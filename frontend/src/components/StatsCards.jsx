@@ -17,7 +17,7 @@ function PeriodToggle({ value, onChange }) {
           onClick={() => onChange(p.key)}
           className={`px-3 py-1 text-xs font-semibold rounded-md transition-all duration-150 ${value === p.key
             ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm'
-            : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+            : 'text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100'
             }`}
         >
           {p.label}
@@ -38,7 +38,7 @@ function StatCard({ title, value, icon, color, sub, breakdown, onClick }) {
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-1">
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-900 dark:text-white mb-1">
             {title}
           </p>
           <p className="text-3xl font-display font-bold leading-none">
@@ -46,11 +46,11 @@ function StatCard({ title, value, icon, color, sub, breakdown, onClick }) {
               ? value
               : <span className="text-slate-300 dark:text-slate-700 text-xl">—</span>}
           </p>
-          {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
+          {sub && <p className="text-xs font-bold text-slate-900 dark:text-white mt-1">{sub}</p>}
           {breakdown && breakdown.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2">
               {breakdown.map((b) => (
-                <span key={b.label} className={`inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded ${b.chip}`}>
+                <span key={b.label} className={`inline-flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded ${b.chip}`}>
                   {b.label}
                   <span className="font-bold">{b.value ?? '—'}</span>
                 </span>
@@ -71,11 +71,27 @@ const ClockIcon = (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
+// const BikeIcon = (
+//   <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+//   </svg>
+// );
 const BikeIcon = (
-  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+  <svg
+    className="w-5 h-5 text-emerald-600"
+    fill="none"
+    stroke="currentColor"
+    viewBox="0 0 24 24"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth={2}
+      d="M5 17a3 3 0 106 0 3 3 0 10-6 0zm8 0a3 3 0 106 0 3 3 0 10-6 0zM5 17l3-7h4l3 7M9 10l-2-3h3l2 3"
+    />
   </svg>
 );
+
 const CarIcon = (
   <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -90,6 +106,11 @@ const InsideIcon = (
 const OutsideIcon = (
   <svg className="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H3m0 0l4-4m-4 4l4 4M9 5h8a2 2 0 012 2v10a2 2 0 01-2 2H9" />
+  </svg>
+);
+const WarningIcon = (
+  <svg className="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
   </svg>
 );
 
@@ -141,12 +162,26 @@ function formatDuration(startValue, endValue = null) {
 }
 
 function OccupancyModal({ status, records, onClose, isLoading }) {
+  const [sortOrder, setSortOrder] = useState('latest');
   if (!status) return null;
 
-  const title = status === 'inside' ? 'Vehicles Still Inside' : 'Vehicles Outside';
-  const headers = status === 'inside'
-    ? ['Card', 'Name', 'Type', 'Inside Since', 'Duration']
-    : ['Card', 'Name', 'Type', 'Entry Time', 'Outside For'];
+  const isInside = status === 'inside' || status === 'overstay';
+  const title = status === 'inside' ? 'Vehicles Still Inside' : status === 'overstay' ? 'Overstaying Vehicles (> 24h)' : 'Vehicles Outside';
+  const headers = isInside
+    ? ['Card', 'Name', 'Type', 'Authorization', 'Inside Since', 'Duration']
+    : ['Card', 'Name', 'Type', 'Authorization', 'Entry Time', 'Outside For'];
+
+  const getAuth = (rec) => {
+    const value = String(rec.PCode ?? '').trim();
+    const authorized = value !== '' && value !== '-';
+    return authorized ? 'Authorized' : 'Unauthorized';
+  };
+
+  const sortedRecords = [...records].sort((a, b) => {
+    const timeA = new Date(isInside ? a.EntryTime : a.ExitTime).getTime() || 0;
+    const timeB = new Date(isInside ? b.EntryTime : b.ExitTime).getTime() || 0;
+    return sortOrder === 'latest' ? timeB - timeA : timeA - timeB;
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
@@ -155,16 +190,32 @@ function OccupancyModal({ status, records, onClose, isLoading }) {
           <div>
             <h3 className="font-display text-xl font-bold">{title}</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Latest vehicle status by tag
+              {isInside ? 'Sorting by Entry Time' : 'Sorting by Exit Time'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-4">
+            <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 p-0.5 gap-0.5">
+              <button
+                onClick={() => setSortOrder('latest')}
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all duration-150 ${sortOrder === 'latest' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+              >
+                Latest
+              </button>
+              <button
+                onClick={() => setSortOrder('oldest')}
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all duration-150 ${sortOrder === 'oldest' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
+              >
+                Oldest
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              Close
+            </button>
+          </div>
         </div>
 
         <div className="overflow-auto max-h-[calc(85vh-80px)]">
@@ -187,21 +238,28 @@ function OccupancyModal({ status, records, onClose, isLoading }) {
                     ))}
                   </tr>
                 ))
-              ) : records.length === 0 ? (
+              ) : sortedRecords.length === 0 ? (
                 <tr>
                   <td colSpan={headers.length} className="px-4 py-10 text-center text-slate-400">
                     No vehicles found.
                   </td>
                 </tr>
               ) : (
-                records.map((record) => (
+                sortedRecords.map((record) => (
                   <tr key={`${record.CardData}-${record.EntryTime}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                     <td className="px-4 py-3 font-mono text-xs">{record.CardData}</td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{record.PName && record.PName !== '-' ? record.PName : '-'}</td>
                     <td className="px-4 py-3">{record.VehicleType}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{formatTime(record.EntryTime)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex rounded px-2 py-0.5 text-xs font-semibold ${getAuth(record) === 'Authorized'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'}`}>
+                        {getAuth(record)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">{formatTime(isInside ? record.EntryTime : record.ExitTime)}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {status === 'inside'
+                      {isInside
                         ? formatDuration(record.EntryTime)
                         : formatDuration(record.ExitTime)}
                     </td>
@@ -267,12 +325,12 @@ export default function StatsCards({ period, setPeriod }) {
 
       {/* Header row with toggle */}
       <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Stats for</p>
+        <p className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wide">Stats for</p>
         <PeriodToggle value={period} onChange={setPeriod} />
       </div>
 
       {/* Cards grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
 
         {/* Total */}
         <StatCard
@@ -290,15 +348,15 @@ export default function StatsCards({ period, setPeriod }) {
         {/* Entry / Exit split */}
         <div className="stat-card !p-0 overflow-hidden flex flex-row">
           <div className="flex-1 border-t-2 border-green-500 p-3 flex flex-col justify-between min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">Entry</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-900 dark:text-white">Entry</p>
             <p className="text-2xl font-display font-bold leading-none">{fmt(p?.entry)}</p>
-            <p className="text-xs text-slate-400">in {sub}</p>
+            <p className="text-xs font-bold text-slate-900 dark:text-white">in {sub}</p>
           </div>
           <div className="w-px self-stretch bg-slate-200 dark:bg-slate-700" />
           <div className="flex-1 border-t-2 border-red-500 p-3 flex flex-col justify-between min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 dark:text-slate-400">Exit</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-900 dark:text-white">Exit</p>
             <p className="text-2xl font-display font-bold leading-none">{fmt(p?.exit)}</p>
-            <p className="text-xs text-slate-400">out {sub}</p>
+            <p className="text-xs font-bold text-slate-900 dark:text-white">out {sub}</p>
           </div>
         </div>
 
@@ -307,7 +365,7 @@ export default function StatsCards({ period, setPeriod }) {
           title="2-Wheelers"
           value={fmt(p?.twoWheeler)}
           color="border-emerald-500"
-          sub={`bikes & scooters ${sub}`}
+          sub={sub}
           icon={BikeIcon}
           breakdown={[
             { label: 'In', value: fmt(p?.twoWheelerEntry), chip: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
@@ -321,7 +379,7 @@ export default function StatsCards({ period, setPeriod }) {
           title="4-Wheelers"
           value={fmt(p?.fourWheeler)}
           color="border-orange-500"
-          sub={`cars & SUVs ${sub}`}
+          sub={sub}
           icon={CarIcon}
           breakdown={[
             { label: 'In', value: fmt(p?.fourWheelerEntry), chip: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
@@ -331,21 +389,12 @@ export default function StatsCards({ period, setPeriod }) {
         />
 
         <StatCard
-          title="Still Inside"
-          value={fmt(occupancy?.insideCount, occupancySummaryLoading)}
-          color="border-violet-500"
-          sub="tap to view inside vehicles"
-          icon={InsideIcon}
-          onClick={() => setOccupancyStatus('inside')}
-        />
-
-        <StatCard
-          title="Outside"
-          value={fmt(occupancy?.outsideCount, occupancySummaryLoading)}
-          color="border-cyan-500"
-          sub="tap to view outside vehicles"
-          icon={OutsideIcon}
-          onClick={() => setOccupancyStatus('outside')}
+          title="Overstay"
+          value={fmt(occupancy?.overstayCount, occupancySummaryLoading)}
+          color="border-rose-500"
+          sub="vehicles beyond 24h"
+          icon={WarningIcon}
+          onClick={() => setOccupancyStatus('overstay')}
         />
 
       </div>

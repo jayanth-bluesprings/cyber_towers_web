@@ -1,0 +1,72 @@
+[
+  {
+    "CardRecordID": "12815",
+    "CardData": "6717409",
+    "EquptName": "14070001 - 1",
+    "PortNum": 1,
+    "DataTime": 46114.6330208333
+  },
+  {
+    "CardRecordID": "12814",
+    "CardData": "3984385",
+    "EquptName": "14070001 - 1",
+    "PortNum": 1,
+    "DataTime": 46114.6330092593
+  },
+  {
+    "CardRecordID": "12812",
+    "CardData": "6717409",
+    "EquptName": "14070001 - 1",
+    "PortNum": 1,
+    "DataTime": 46114.6330092593
+  },
+  {
+    "CardRecordID": "12809",
+    "CardData": "6717409",
+    "EquptName": "14070001 - 1",
+    "PortNum": 1,
+    "DataTime": 46114.6329976852
+  },
+  {
+    "CardRecordID": "12807",
+    "CardData": "6717409",
+    "EquptName": "14070001 - 1",
+    "PortNum": 1,
+    "DataTime": 46114.6329861111
+  },
+  {
+    "CardRecordID": "12806",
+    "CardData": "122881",
+    "EquptName": "14070001 - 1",
+    "PortNum": 1,
+    "DataTime": 46114.6307407407
+  },
+  {
+    "CardRecordID": "12804",
+    "CardData": "8910849",
+    "EquptName": "14070001 - 1",
+    "PortNum": 1,
+    "DataTime": 46114.629375
+  },
+  {
+    "CardRecordID": "12803",
+    "CardData": "100249",
+    "EquptName": "14070001 - 1",
+    "PortNum": 1,
+    "DataTime": 46114.623900463
+  },
+  {
+    "CardRecordID": "12802",
+    "CardData": "9961976",
+    "EquptName": "14070001 - 1",
+    "PortNum": 1,
+    "DataTime": 46114.6227083333
+  },
+  {
+    "CardRecordID": "12801",
+    "CardData": "14156280",
+    "EquptName": "14070001 - 1",
+    "PortNum": 1,
+    "DataTime": 46114.6226967593
+  }
+]

@@ -7,11 +7,22 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 const { initWebSocket, startPolling } = require('./websocket');
 const apiRoutes = require('./routes/api');
 const { query } = require('./db');
+const { requireApiKey } = require('./middleware/auth');
+const { initCronJobs } = require('./services/cronJobs');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const frontendDistPath = path.join(__dirname, '..', 'frontend', 'dist');
 const frontendIndexPath = path.join(frontendDistPath, 'index.html');
+
+function getAllowedOrigins() {
+  const raw = process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || '*';
+  if (!raw || raw === '*') return '*';
+  return raw
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
 
 function hasFrontendBuild() {
   return fs.existsSync(frontendIndexPath);
@@ -19,9 +30,10 @@ function hasFrontendBuild() {
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: getAllowedOrigins(),
   methods: ['GET', 'POST'],
   credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -33,7 +45,7 @@ app.use((req, res, next) => {
 });
 
 // API Routes
-app.use('/api', apiRoutes);
+app.use('/api', requireApiKey, apiRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -68,6 +80,9 @@ const wss = initWebSocket(server);
 
 // Start DB polling for live updates
 startPolling((q) => query(q));
+
+// Init automated email cron jobs
+initCronJobs();
 
 // Start server
 server.listen(PORT, () => {
