@@ -33,21 +33,15 @@ function VehicleBadge({ type }) {
 }
 
 function getGateInfo(equptName, portNum) {
+  // Direction: PortNum 1 = entry, 2 = exit
   const port = parseInt(portNum, 10);
-  let dir;
-  if (port === 2) {
-    dir = 'exit';
-  } else if (port === 1) {
-    dir = 'entry';
-  } else {
-    const raw = String(equptName || '').trim();
-    const v = raw.toLowerCase();
-    const isExit = ['exit', 'out', 'gate 2', 'gate-2', '24074151'].some((kw) => v.includes(kw));
-    const isEntry = ['entry', 'in', 'gate 1', 'gate-1'].some((kw) => v.includes(kw));
-    dir = isExit ? 'exit' : isEntry ? 'entry' : 'unknown';
-  }
+  const dir = port === 2 ? 'exit' : port === 1 ? 'entry' : 'unknown';
 
-  const label = dir === 'entry' ? 'Gate 1' : dir === 'exit' ? 'Gate 2' : String(equptName || '-').trim();
+  // Physical gate: device 14070001 = Gate 1, device 24074151 = Gate 2
+  const name = String(equptName || '').trim();
+  const gateNum = name.includes('24074151') ? 2 : 1;
+  const label = `Gate ${gateNum}`;
+
   const icon = dir === 'entry' ? '↑' : dir === 'exit' ? '↓' : '?';
   const className =
     dir === 'entry'
@@ -56,7 +50,7 @@ function getGateInfo(equptName, portNum) {
         ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border-red-200 dark:border-red-800'
         : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700';
 
-  return { label, dir, icon, className };
+  return { label, dir, icon, className, gateNum };
 }
 
 function getAuthStatus(pcode, isLocallyAllowed = false) {
@@ -88,6 +82,32 @@ function getDisplayVehicleNo(record, approval) {
   ).trim() || '-';
 }
 
+const COMPANY_NAME_MAP = {
+  MSF: 'Microsoft India',
+  GGL: 'Google India',
+  AMZ: 'Amazon India',
+  INF: 'Infosys Ltd',
+  WIP: 'Wipro Technologies',
+  TCS: 'Tata Consultancy Services',
+  TM:  'Tech Mahindra',
+  COG: 'Cognizant Technology Solutions',
+  DEL: 'Deloitte India',
+  JPM: 'JP Morgan Services India',
+};
+
+function getCompanyName(flatCode) {
+  if (!flatCode || flatCode === '-') return '-';
+  const prefix = String(flatCode).split('-')[0].toUpperCase();
+  return COMPANY_NAME_MAP[prefix] || flatCode;
+}
+
+// "Microsoft India PS-1/22" → "1/22"
+function getSlotLabel(parkingSpace) {
+  if (!parkingSpace || parkingSpace === '-') return null;
+  const match = String(parkingSpace).match(/PS-(\d+\/\d+)/);
+  return match ? match[1] : null;
+}
+
 function csvEscape(value) {
   if (value === undefined || value === null) return '';
   const text = String(value);
@@ -102,7 +122,7 @@ function exportCSV(records, localApprovals = {}, parkingByCardId = new Map()) {
   const rows = records.map((r) => {
     const gate = getGateInfo(r.EquptName, r.PortNum);
     const key = getApprovalKey(r);
-    const auth = getAuthStatus(r.PCode, Boolean(localApprovals[key]));
+    const auth = getAuthStatus(r.PCode);
     const parkingSlot = parkingByCardId.get(getApprovalKey(r)) || '-';
     const vehicleNo = getDisplayVehicleNo(r, localApprovals[key]);
     return [
@@ -276,12 +296,13 @@ export default function LiveTable({ onWsStatus }) {
 
   const sourceRecords = debouncedSearch ? searchRecords : records;
   const activeRecords = gateTab === 'gate1'
-    ? sourceRecords.filter((r) => getGateInfo(r.EquptName, r.PortNum).dir === 'entry')
+    ? sourceRecords.filter((r) => getGateInfo(r.EquptName, r.PortNum).gateNum === 1)
     : gateTab === 'gate2'
-      ? sourceRecords.filter((r) => getGateInfo(r.EquptName, r.PortNum).dir === 'exit')
+      ? sourceRecords.filter((r) => getGateInfo(r.EquptName, r.PortNum).gateNum === 2)
       : sourceRecords;
 
   const connectWs = useCallback(() => {
+    if (!WS_URL) { onWsStatus?.('connected'); return; }
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     onWsStatus?.('connecting');
@@ -466,7 +487,9 @@ export default function LiveTable({ onWsStatus }) {
                 const gate = getGateInfo(record.EquptName, record.PortNum);
                 const key = getApprovalKey(record);
                 const approval = localApprovals[key];
-                const auth = getAuthStatus(record.PCode, Boolean(approval));
+                // Raw auth: always shows "Unauthorized" regardless of local approval
+                const auth = getAuthStatus(record.PCode);
+                const isLocallyAllowed = Boolean(approval?.remark);
                 return (
                   <tr
                     key={record.CardRecordID}
@@ -492,10 +515,10 @@ export default function LiveTable({ onWsStatus }) {
                       <VehicleBadge type={record.vehicleType} />
                     </td>
 
-                    {/* Flat / Code */}
+                    {/* Company Name */}
                     <td className="px-3 py-3 hidden md:table-cell">
-                      <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-                        {record.flatNumber || record.PCode || '-'}
+                      <span className="text-xs text-slate-700 dark:text-slate-300">
+                        {getCompanyName(record.flatNumber || record.PCode)}
                       </span>
                     </td>
 
@@ -507,25 +530,38 @@ export default function LiveTable({ onWsStatus }) {
                     </td>
 
                     {/* Parking Slot */}
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {(() => {
+                        const slot = getSlotLabel(parkingByCardId.get(getApprovalKey(record)));
+                        return slot ? (
+                          <span className="inline-flex rounded-md px-2 py-1 text-xs font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                            {slot}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400 dark:text-slate-500">No Slot</span>
+                        );
+                      })()}
+                    </td>
+
                     <td className="px-3 py-3">
-                      <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
-                        {parkingByCardId.get(getApprovalKey(record)) || '-'}
+                      <span className="relative group inline-flex">
+                        <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold cursor-default ${auth.className}`}>
+                          {auth.label}
+                        </span>
+                        {record.CarNumber && (
+                          <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center z-50">
+                            <span className="whitespace-nowrap rounded-lg bg-slate-800 dark:bg-slate-700 text-white text-[11px] font-semibold px-2.5 py-1.5 shadow-xl">
+                              {record.CarNumber}
+                            </span>
+                            <span className="border-4 border-transparent border-t-slate-800 dark:border-t-slate-700" />
+                          </span>
+                        )}
                       </span>
                     </td>
 
                     <td className="px-3 py-3">
-                      <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold ${auth.className}`}>
-                        {auth.label}
-                      </span>
-                      {approval?.remark && (
-                        <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 max-w-[180px] truncate" title={approval.remark}>
-                          {approval.remark}
-                        </p>
-                      )}
-                    </td>
-
-                    <td className="px-3 py-3">
-                      {!auth.isAuthorized ? (
+                      {!auth.isAuthorized && gate.dir === 'entry' && !isLocallyAllowed ? (
+                        /* Unauthorized entry — not yet approved: show Allow button */
                         <button
                           type="button"
                           onClick={() => openAllowModal(record)}
@@ -533,6 +569,16 @@ export default function LiveTable({ onWsStatus }) {
                         >
                           Allow
                         </button>
+                      ) : !auth.isAuthorized && gate.dir === 'exit' && isLocallyAllowed ? (
+                        /* Unauthorized exit — was approved on entry: show the reason */
+                        <div className="flex flex-col gap-0.5">
+                          <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                            ✓ Allowed
+                          </span>
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-[160px] truncate leading-tight" title={approval.remark}>
+                            {approval.remark}
+                          </p>
+                        </div>
                       ) : (
                         <span className="text-xs text-slate-400">-</span>
                       )}

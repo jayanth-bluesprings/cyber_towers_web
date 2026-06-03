@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar.jsx';
 import { fetchAuthorizedVehicles, WS_URL } from '../api/index.js';
 import { loadParkingAllocations, saveParkingAllocations } from '../utils/parkingStorage.js';
 import { loadRegisteredVehiclesState, saveRegisteredVehiclesState } from '../utils/registeredVehiclesStorage.js';
+import { DUMMY_COMPANIES } from '../data/dummyData.js';
 
 function normalize(value) {
   if (value == null) return '';
@@ -46,18 +47,52 @@ function authBadgeClass(authorization) {
     : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300';
 }
 
+const COMPANY_NAME_MAP = {
+  MSF: 'Microsoft India',
+  GGL: 'Google India',
+  AMZ: 'Amazon India',
+  INF: 'Infosys Ltd',
+  WIP: 'Wipro Technologies',
+  TCS: 'Tata Consultancy Services',
+  TM:  'Tech Mahindra',
+  COG: 'Cognizant Technology Solutions',
+  DEL: 'Deloitte India',
+  JPM: 'JP Morgan Services India',
+};
+
+function getCompanyName(addr) {
+  if (!addr || addr === '-') return '-';
+  const prefix = String(addr).split('-')[0].toUpperCase();
+  return COMPANY_NAME_MAP[prefix] || addr;
+}
+
+// "Microsoft India PS-1/22" → "1/22"
+function getSlotLabel(parkingSpace) {
+  if (!parkingSpace || parkingSpace === '-') return null;
+  const match = String(parkingSpace).match(/PS-(\d+\/\d+)/);
+  return match ? match[1] : null;
+}
+
 function loadCompanies() {
   try {
     const stored = localStorage.getItem('registeredCompanies');
-    return stored ? JSON.parse(stored) : [];
+    const parsed = stored ? JSON.parse(stored) : [];
+    const existing = Array.isArray(parsed) ? parsed : [];
+    // Always guarantee all 10 dummy companies are present
+    const dummyIds = new Set(DUMMY_COMPANIES.map((c) => c.id));
+    const userAdded = existing.filter((c) => !dummyIds.has(c.id));
+    return [...DUMMY_COMPANIES, ...userAdded];
   } catch {
-    return [];
+    return DUMMY_COMPANIES;
   }
 }
 
 function saveCompanies(list) {
   try {
-    localStorage.setItem('registeredCompanies', JSON.stringify(list));
+    // Always persist dummy companies + user-added ones
+    const dummyIds = new Set(DUMMY_COMPANIES.map((c) => c.id));
+    const userAdded = list.filter((c) => !dummyIds.has(c.id));
+    localStorage.setItem('registeredCompanies', JSON.stringify([...DUMMY_COMPANIES, ...userAdded]));
   } catch {
     // ignore
   }
@@ -111,6 +146,7 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
 
   useEffect(() => {
     function connectScanWs() {
+      if (!WS_URL) return;
       if (scanWsRef.current?.readyState === WebSocket.OPEN) return;
       try {
         const ws = new WebSocket(WS_URL);
@@ -459,7 +495,7 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
                     <tr key={vehicle.CardData} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                       <td className="px-4 py-3 font-mono text-xs">{vehicle.CardData}</td>
                       <td className="px-4 py-3">{vehicle.PName || '-'}</td>
-                      <td className="px-4 py-3">{vehicle.Addr || '-'}</td>
+                      <td className="px-4 py-3 text-xs text-slate-700 dark:text-slate-300">{getCompanyName(vehicle.Addr)}</td>
                       <td className="px-4 py-3">{vehicle.vehicleType || '-'}</td>
                       <td className="px-4 py-3">{vehicle.BloodGroup || '-'}</td>
                       <td className="px-4 py-3">
@@ -467,7 +503,18 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
                           {vehicle.Authorization || 'Active'}
                         </span>
                       </td>
-                      <td className="px-4 py-3">{parkingByCardId.get(cardKey(vehicle.CardData)) || '-'}</td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const slot = getSlotLabel(parkingByCardId.get(cardKey(vehicle.CardData)));
+                          return slot ? (
+                            <span className="inline-flex rounded-md px-2 py-1 text-xs font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                              {slot}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400 dark:text-slate-500">No Slot</span>
+                          );
+                        })()}
+                      </td>
                       <td className="px-4 py-3">
                         <button type="button" onClick={() => openEditModal(vehicle)} className="rounded-md bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200 px-2.5 py-1 text-xs font-semibold">Edit</button>
                       </td>

@@ -116,8 +116,8 @@ const WarningIcon = (
 
 const PERIOD_SUB = {
   day: 'today',
-  week: 'last 7 days',
-  month: 'last 30 days',
+  week: 'this week',
+  month: 'this month',
 };
 
 function formatTime(value) {
@@ -312,6 +312,13 @@ export default function StatsCards({ period, setPeriod }) {
 
   const sub = PERIOD_SUB[period];
 
+  // For "Day" view, "In" means still inside now (entry − exit).
+  // For Week/Month, show raw entry/exit scan counts instead.
+  const isDay = period === 'day';
+  const stillInside       = Math.max(0, (p?.entry           ?? 0) - (p?.exit           ?? 0));
+  const twoWheelerInside  = Math.max(0, (p?.twoWheelerEntry ?? 0) - (p?.twoWheelerExit ?? 0));
+  const fourWheelerInside = Math.max(0, (p?.fourWheelerEntry ?? 0) - (p?.fourWheelerExit ?? 0));
+
   if (isError) {
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 p-4 text-sm text-red-600 dark:text-red-400">
@@ -337,11 +344,11 @@ export default function StatsCards({ period, setPeriod }) {
           title="Vehicles"
           value={fmt(p?.total)}
           color="border-sky-500"
-          sub={`scanned ${sub}`}
+          sub={`visited ${sub}`}
           icon={ClockIcon}
           breakdown={[
-            { label: 'In',  value: fmt(p?.entry), chip: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-            { label: 'Out', value: fmt(p?.exit),  chip: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+            { label: isDay ? 'Inside' : 'In',  value: fmt(isDay ? stillInside : p?.entry), chip: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+            { label: isDay ? 'Exited' : 'Out', value: fmt(p?.exit),                        chip: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
           ]}
         />
 
@@ -368,8 +375,8 @@ export default function StatsCards({ period, setPeriod }) {
           sub={sub}
           icon={BikeIcon}
           breakdown={[
-            { label: 'In', value: fmt(p?.twoWheelerEntry), chip: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-            { label: 'Out', value: fmt(p?.twoWheelerExit), chip: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+            { label: isDay ? 'Inside' : 'In',  value: fmt(isDay ? twoWheelerInside : p?.twoWheelerEntry), chip: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+            { label: isDay ? 'Exited' : 'Out', value: fmt(p?.twoWheelerExit),                             chip: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
             ...(p?.total ? [{ label: 'of total', value: pct(p.twoWheeler, p.total), chip: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' }] : []),
           ]}
         />
@@ -382,8 +389,8 @@ export default function StatsCards({ period, setPeriod }) {
           sub={sub}
           icon={CarIcon}
           breakdown={[
-            { label: 'In', value: fmt(p?.fourWheelerEntry), chip: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-            { label: 'Out', value: fmt(p?.fourWheelerExit), chip: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+            { label: isDay ? 'Inside' : 'In',  value: fmt(isDay ? fourWheelerInside : p?.fourWheelerEntry), chip: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+            { label: isDay ? 'Exited' : 'Out', value: fmt(p?.fourWheelerExit),                              chip: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
             ...(p?.total ? [{ label: 'of total', value: pct(p.fourWheeler, p.total), chip: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' }] : []),
           ]}
         />
@@ -398,18 +405,6 @@ export default function StatsCards({ period, setPeriod }) {
         />
 
       </div>
-
-      {/* Debug panel */}
-      {import.meta.env.DEV && rawStats && (
-        <details className="mt-2">
-          <summary className="text-xs text-slate-400 cursor-pointer hover:text-slate-600">
-            🔍 Raw API response (dev only)
-          </summary>
-          <pre className="mt-1 text-xs bg-slate-100 dark:bg-slate-800 rounded p-3 overflow-auto max-h-48 text-slate-600 dark:text-slate-300">
-            {JSON.stringify(rawStats, null, 2)}
-          </pre>
-        </details>
-      )}
 
       <OccupancyModal
         status={occupancyStatus}

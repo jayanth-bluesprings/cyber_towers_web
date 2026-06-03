@@ -29,29 +29,16 @@ function formatTime(scanTime) {
 }
 
 function getGateInfo(equptName, portNum) {
-  // PortNum from the DB is the authoritative direction signal:
-  //   PortNum = 1  → Entry Gate 1  (vehicle entering)
-  //   PortNum = 2  → Exit Gate 2   (vehicle exiting)
-  // EquptName contains the device ID (e.g. "14070001 - 1") and is NOT reliable
-  // for direction detection, so we primarily use PortNum.
-
+  // Direction: PortNum 1 = entry, 2 = exit
   const port = parseInt(portNum, 10);
+  const dir = port === 2 ? 'exit' : port === 1 ? 'entry' : 'unknown';
 
-  let dir;
-  if (port === 2) {
-    dir = 'exit';
-  } else if (port === 1) {
-    dir = 'entry';
-  } else {
-    // Fallback: try keyword matching on EquptName (avoid matching device IDs)
-    const raw = String(equptName || '').trim();
-    const v = raw.toLowerCase();
-    const isExit = ['exit', 'out', 'gate 2', 'gate-2', '24074151'].some((kw) => v.includes(kw));
-    const isEntry = ['entry', 'in', 'gate 1', 'gate-1'].some((kw) => v.includes(kw));
-    dir = isExit ? 'exit' : isEntry ? 'entry' : 'unknown';
-  }
+  // Physical gate: determined by device ID in EquptName
+  // Device 14070001 = Gate 1,  Device 24074151 = Gate 2
+  const name = String(equptName || '').trim();
+  const gateNum = name.includes('24074151') ? 2 : 1;
+  const label = `Gate ${gateNum}`;
 
-  const label = dir === 'entry' ? 'Gate 1' : dir === 'exit' ? 'Gate 2' : String(equptName || '-').trim();
   const icon = dir === 'entry' ? '↑' : dir === 'exit' ? '↓' : '?';
   const className =
     dir === 'entry'
@@ -60,7 +47,7 @@ function getGateInfo(equptName, portNum) {
         ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border-red-200 dark:border-red-800'
         : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700';
 
-  return { label, dir, icon, className };
+  return { label, dir, icon, className, gateNum };
 }
 
 function getAuthStatus(pcode, isLocallyAllowed = false) {
@@ -90,6 +77,32 @@ function getDisplayVehicleNo(record, approval) {
     record?.CarNumber ||
     ''
   ).trim() || '-';
+}
+
+const COMPANY_NAME_MAP = {
+  MSF: 'Microsoft India',
+  GGL: 'Google India',
+  AMZ: 'Amazon India',
+  INF: 'Infosys Ltd',
+  WIP: 'Wipro Technologies',
+  TCS: 'Tata Consultancy Services',
+  TM:  'Tech Mahindra',
+  COG: 'Cognizant Technology Solutions',
+  DEL: 'Deloitte India',
+  JPM: 'JP Morgan Services India',
+};
+
+function getCompanyName(flatCode) {
+  if (!flatCode || flatCode === '-') return '-';
+  const prefix = String(flatCode).split('-')[0].toUpperCase();
+  return COMPANY_NAME_MAP[prefix] || flatCode;
+}
+
+// "Microsoft India PS-1/22" → "1/22"
+function getSlotLabel(parkingSpace) {
+  if (!parkingSpace || parkingSpace === '-') return null;
+  const match = String(parkingSpace).match(/PS-(\d+\/\d+)/);
+  return match ? match[1] : null;
 }
 
 const DEDUP_SECONDS = 60; // 60 s window: collapses rapid burst reads from exit scanner
@@ -124,7 +137,7 @@ function exportCSV(records, localApprovals = {}, parkingByCardId = new Map()) {
   const rows = records.map((r) => {
     const gate = getGateInfo(r.EquptName, r.PortNum);
     const key = getApprovalKey(r);
-    const auth = getAuthStatus(r.PCode, Boolean(localApprovals[key]));
+    const auth = getAuthStatus(r.PCode);
     const parkingSlot = parkingByCardId.get(getApprovalKey(r)) || '-';
     const vehicleNo = getDisplayVehicleNo(r, localApprovals[key]);
     return [
@@ -298,6 +311,7 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
 
   /* WebSocket live push */
   const connectWs = useCallback(() => {
+    if (!WS_URL) { setWsStatus('connected'); return; }
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
     setWsStatus('connecting');
     try {
@@ -347,12 +361,11 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
       ? dateRangeRecords
       : records;
 
-  // Gate 1 = Entry (PortNum 1), Gate 2 = Exit (PortNum 2)
-  // Show all records in 'all' view; filter by gate when a specific tab is selected
+  // Gate tab filters by physical gate (device), not direction
   const baseActiveRecords = gateTab === 'gate1'
-    ? sourceRecords.filter((r) => getGateInfo(r.EquptName, r.PortNum).dir === 'entry')
+    ? sourceRecords.filter((r) => getGateInfo(r.EquptName, r.PortNum).gateNum === 1)
     : gateTab === 'gate2'
-      ? sourceRecords.filter((r) => getGateInfo(r.EquptName, r.PortNum).dir === 'exit')
+      ? sourceRecords.filter((r) => getGateInfo(r.EquptName, r.PortNum).gateNum === 2)
       : sourceRecords;
   const activeRecords = baseActiveRecords.filter((r) => {
     if (dayToggle === 'today') {
@@ -372,14 +385,16 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
   });
   
   const loading = isLoading || searchLoading;
-  const entryCount = sourceRecords.filter((r) => getGateInfo(r.EquptName, r.PortNum).dir === 'entry').length;
-  const exitCount = sourceRecords.filter((r) => getGateInfo(r.EquptName, r.PortNum).dir === 'exit').length;
 
   const filtered = activeRecords.filter((r) => {
     if (dirFilter === 'entry') return getGateInfo(r.EquptName, r.PortNum).dir === 'entry';
     if (dirFilter === 'exit') return getGateInfo(r.EquptName, r.PortNum).dir === 'exit';
     return true;
   });
+
+  // Counts always from the fully-filtered set so pills match the table
+  const entryCount = filtered.filter((r) => getGateInfo(r.EquptName, r.PortNum).dir === 'entry').length;
+  const exitCount  = filtered.filter((r) => getGateInfo(r.EquptName, r.PortNum).dir === 'exit').length;
 
   const parkingByCardId = useMemo(() => {
     const map = new Map();
@@ -421,7 +436,7 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
               </span>
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span>Real-time vehicle scan feed · Showing latest {activeRecords.length} scans</span>
+              <span>Real-time vehicle scan feed · Showing latest {filtered.length} scans</span>
               <span className="inline-block md:hidden">|</span>
               <span className="text-xs font-mono opacity-60">Last update: {new Date().toLocaleTimeString('en-IN', { hour12: false })}</span>
             </p>
@@ -431,7 +446,7 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
           <div className="flex gap-3 flex-wrap">
             <StatPill
               label="Total Scans"
-              value={activeRecords.length}
+              value={filtered.length}
               icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
               colorClass="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
             />
@@ -648,7 +663,9 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
                     const gate = getGateInfo(record.EquptName, record.PortNum);
                     const key = getApprovalKey(record);
                     const approval = localApprovals[key];
-                    const auth = getAuthStatus(record.PCode, Boolean(approval));
+                    // Raw auth: always shows "Unauthorized" for unregistered cards regardless of local approval
+                    const auth = getAuthStatus(record.PCode);
+                    const isLocallyAllowed = Boolean(approval?.remark);
                     return (
                       <tr
                         key={record.CardRecordID}
@@ -674,10 +691,10 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
                           <VehicleBadge type={record.vehicleType} />
                         </td>
 
-                        {/* Flat / Code */}
+                        {/* Company Name */}
                         <td className="px-3 py-3 hidden md:table-cell">
-                          <span className="text-xs font-mono text-slate-500 dark:text-slate-400">
-                            {record.flatNumber || record.PCode || '-'}
+                          <span className="text-xs text-slate-700 dark:text-slate-300">
+                            {getCompanyName(record.flatNumber || record.PCode)}
                           </span>
                         </td>
 
@@ -689,24 +706,37 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
                         </td>
 
                         {/* Parking Slot */}
-                        <td className="px-3 py-3">
-                          <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
-                            {parkingByCardId.get(getApprovalKey(record)) || '-'}
-                          </span>
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          {(() => {
+                            const slot = getSlotLabel(parkingByCardId.get(getApprovalKey(record)));
+                            return slot ? (
+                              <span className="inline-flex rounded-md px-2 py-1 text-xs font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                                {slot}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-slate-400 dark:text-slate-500">No Slot</span>
+                            );
+                          })()}
                         </td>
                         <td className="px-3 py-3">
-                          <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold ${auth.className}`}>
-                            {auth.label}
+                          <span className="relative group inline-flex">
+                            <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold cursor-default ${auth.className}`}>
+                              {auth.label}
+                            </span>
+                            {record.CarNumber && (
+                              <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center z-50">
+                                <span className="whitespace-nowrap rounded-lg bg-slate-800 dark:bg-slate-700 text-white text-[11px] font-semibold px-2.5 py-1.5 shadow-xl">
+                                  {record.CarNumber}
+                                </span>
+                                <span className="border-4 border-transparent border-t-slate-800 dark:border-t-slate-700" />
+                              </span>
+                            )}
                           </span>
-                          {approval?.remark && (
-                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 max-w-[180px] truncate" title={approval.remark}>
-                              {approval.remark}
-                            </p>
-                          )}
                         </td>
 
                         <td className="px-3 py-3">
-                          {!auth.isAuthorized ? (
+                          {!auth.isAuthorized && gate.dir === 'entry' && !isLocallyAllowed ? (
+                            /* Unauthorized entry — not yet approved: show Allow button */
                             <button
                               type="button"
                               onClick={() => openAllowModal(record)}
@@ -714,6 +744,16 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
                             >
                               Allow
                             </button>
+                          ) : !auth.isAuthorized && gate.dir === 'exit' && isLocallyAllowed ? (
+                            /* Unauthorized exit — was approved on entry: show the reason */
+                            <div className="flex flex-col gap-0.5">
+                              <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                                ✓ Allowed
+                              </span>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-[160px] truncate leading-tight" title={approval.remark}>
+                                {approval.remark}
+                              </p>
+                            </div>
                           ) : (
                             <span className="text-xs text-slate-400">-</span>
                           )}

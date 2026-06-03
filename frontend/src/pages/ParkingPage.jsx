@@ -284,8 +284,8 @@ export default function ParkingPage({ dark, setDark, onNavigate, onLogout, activ
                       <td className="px-4 py-3 text-slate-700 dark:text-slate-200 whitespace-nowrap">{item.vehicleNo || '-'}</td>
                       <td className="px-4 py-3 text-slate-700 dark:text-slate-200 whitespace-nowrap">{item.companyName || '-'}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
-                          {item.parkingSpace}
+                        <span className="inline-flex rounded-md px-2 py-1 text-xs font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                          {item.parkingSpace || 'No Slot Assigned'}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{item.remark || '-'}</td>

@@ -1,37 +1,98 @@
-import axios from 'axios';
+import {
+  DUMMY_LIVE_RECORDS,
+  DUMMY_AUTHORIZED_VEHICLES,
+  DUMMY_VEHICLE_COUNT,
+  getDummyVehicleStats,
+  DUMMY_VEHICLE_TYPE_COUNT,
+  DUMMY_OCCUPANCY_SUMMARY,
+  getDummyOccupancyRecords,
+  DUMMY_24H_ALERT,
+} from '../data/dummyData.js';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-const API_KEY = import.meta.env.VITE_API_KEY || '';
+// No real WebSocket in demo mode — setting null so components skip connection
+export const WS_URL = null;
 
-const api = axios.create({
-  baseURL: `${BASE_URL}/api`,
-  timeout: 60000,
-  headers: API_KEY ? { 'X-API-Key': API_KEY } : {},
-});
+// ─── Live Records ─────────────────────────────────────────────────────────────
 
-api.interceptors.response.use(
-  (res) => res.data,
-  (err) => {
-    console.error('API Error:', err.message);
-    return Promise.reject(err);
+export function fetchLive(params = {}) {
+  let records = [...DUMMY_LIVE_RECORDS];
+
+  if (params.startDate) {
+    records = records.filter(r => r.ScanTime >= params.startDate);
   }
-);
+  if (params.endDate) {
+    records = records.filter(r => r.ScanTime <= params.endDate + 'T23:59:59');
+  }
 
-export const fetchLive = (params = {}) => api.get('/live', { params });
-export const fetchNew = (lastId) => api.get(`/new?lastId=${lastId}`);
-export const fetchSearch = (q, params = {}) => api.get('/search', { params: { q, ...params } });
-export const fetchAuthorizedVehicles = () => api.get('/authorized-vehicles');
-export const fetchVehicleStats = (period = 'day') => api.get(`/vehicle-stats?period=${encodeURIComponent(period)}`);
-export const fetchVehicleTypeCount = () => api.get('/vehicle-type-count');
-export const fetchVehicleCount = () => api.get('/vehicle-count');
-export const fetchVehicleOccupancy = (status = '') =>
-  api.get(status ? `/report/occupancy?status=${encodeURIComponent(status)}` : '/report/occupancy');
-export const fetchTrigger24hAlert = () => api.get('/alerts/trigger-24h');
-export const fetchHealthEvents = () => api.get('/health/events');
+  return Promise.resolve({ data: records });
+}
 
-const wsBaseUrl = BASE_URL.replace(/^http/, 'ws');
-export const WS_URL = API_KEY
-  ? `${wsBaseUrl}?apiKey=${encodeURIComponent(API_KEY)}`
-  : wsBaseUrl;
+export function fetchNew() {
+  return Promise.resolve({ data: [] });
+}
 
-export default api;
+export function fetchSearch(q, params = {}) {
+  if (!q) return Promise.resolve({ data: DUMMY_LIVE_RECORDS });
+
+  const term = String(q).trim().toLowerCase();
+  let results = DUMMY_LIVE_RECORDS.filter(r =>
+    String(r.CardData || '').toLowerCase().includes(term) ||
+    String(r.PName || '').toLowerCase().includes(term) ||
+    String(r.flatNumber || '').toLowerCase().includes(term) ||
+    String(r.vehicleType || '').toLowerCase().includes(term)
+  );
+
+  if (params.startDate) results = results.filter(r => r.ScanTime >= params.startDate);
+  if (params.endDate)   results = results.filter(r => r.ScanTime <= params.endDate + 'T23:59:59');
+
+  return Promise.resolve({ data: results });
+}
+
+// ─── Config / Authorized Vehicles ────────────────────────────────────────────
+
+export function fetchAuthorizedVehicles() {
+  return Promise.resolve({ data: DUMMY_AUTHORIZED_VEHICLES });
+}
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+
+export function fetchVehicleStats(period = 'day') {
+  return Promise.resolve({ data: getDummyVehicleStats(period) });
+}
+
+export function fetchVehicleTypeCount() {
+  return Promise.resolve({ data: DUMMY_VEHICLE_TYPE_COUNT });
+}
+
+export function fetchVehicleCount() {
+  return Promise.resolve(DUMMY_VEHICLE_COUNT);
+}
+
+// ─── Occupancy ────────────────────────────────────────────────────────────────
+
+export function fetchVehicleOccupancy(status = '') {
+  if (!status) {
+    return Promise.resolve({ data: DUMMY_OCCUPANCY_SUMMARY });
+  }
+  return Promise.resolve({ data: { records: getDummyOccupancyRecords(status) } });
+}
+
+// ─── 24h Alert ────────────────────────────────────────────────────────────────
+
+export function fetchTrigger24hAlert() {
+  return Promise.resolve({ data: DUMMY_24H_ALERT });
+}
+
+// ─── Health Check ─────────────────────────────────────────────────────────────
+
+export function fetchHealthEvents() {
+  return Promise.resolve({
+    data: {
+      rfidCount: 29,
+      lightCount: 29,
+      mismatch: 0,
+    },
+  });
+}
+
+export default { fetchLive, fetchNew, fetchSearch, fetchAuthorizedVehicles, fetchVehicleStats, fetchVehicleTypeCount, fetchVehicleCount, fetchVehicleOccupancy, fetchTrigger24hAlert, fetchHealthEvents };
