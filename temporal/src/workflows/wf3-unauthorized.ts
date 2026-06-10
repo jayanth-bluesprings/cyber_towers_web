@@ -5,24 +5,15 @@
 //  TRIGGERED BY: WF1 when a vehicle scans but PCode is empty/'-'
 //
 //  WHAT IT DOES:
-//    1. Block the gate (deny signal)
-//    2. Show LED message: "UNAUTHORIZED — Security Notified"
-//    3. Send alert email to system admin / security desk
+//    1. Show LED: "UNAUTHORIZED — Security Notified"
+//    2. Broadcast scan to dashboard
+//    3. Send alert email to security desk
 //    4. Write audit log (ENTRY_DENIED_UNAUTHORIZED)
-//    5. WAIT up to 10 minutes for the security officer to decide
-//    6. If APPROVED → open gate + audit log
-//    7. If DENIED or no response in 10 min → stay closed + audit log
+//    5. WAIT up to 10 minutes for security officer to decide
+//    6. If APPROVED → LED "✓ ALLOWED", return { approved: true }
+//    7. If DENIED or timeout → LED "✗ DENIED", broadcast DENIED, return { approved: false }
 //
-//  NEW TYPESCRIPT CONCEPT — const vs let:
-//    const = the variable CANNOT be reassigned (it's fixed)
-//            e.g. const name = "Pavan"  ← can't do name = "Someone" later
-//    let   = the variable CAN be reassigned
-//            e.g. let count = 0;  then later  count = 1;  ← ok
-//
-//  NEW TYPESCRIPT CONCEPT — null vs undefined:
-//    null      = "intentionally empty" — you set it to null on purpose
-//    undefined = "never assigned" — variable was declared but never given a value
-//    In our code we use null to mean "no decision yet"
+//  NOTE: There is NO physical gate. The LED display is the only output.
 //
 // ═══════════════════════════════════════════════════════════════
 
@@ -42,7 +33,7 @@ const db = wf.proxyActivities<typeof dbAct>({
   retry: { maximumAttempts: 3 },
 });
 
-const gate = wf.proxyActivities<typeof gateAct>({
+const led = wf.proxyActivities<typeof gateAct>({
   startToCloseTimeout: '15 seconds',
   retry: { maximumAttempts: 5 },
 });
@@ -59,26 +50,16 @@ const ws = wf.proxyActivities<typeof wsAct>({
 
 // ─── THE WORKFLOW FUNCTION ────────────────────────────────────
 export async function wf3UnauthorizedApproval(
-  input: EntryEvent    // the same EntryEvent passed from WF1
-): Promise<void> {
+  input: EntryEvent
+): Promise<{ approved: boolean }> {
 
-  // ── STEP 1: Block gate + broadcast to dashboard ──────────
-  // Run gate deny AND dashboard broadcast in parallel.
-  // broadcastDeniedScan sends the scan to the Live Entry/Exit page
-  // so it appears even when testing with the simulator (which doesn't
-  // write to CardRecord — the normal DB poll wouldn't pick it up).
+  // ── STEP 1: LED + broadcast to dashboard ─────────────────
   await Promise.all([
-    gate.denyGate(input.gate, 'UNAUTHORIZED VEHICLE — SECURITY NOTIFIED'),
-    ws.broadcastDeniedScan(input, '', ''),   // no name/company for unknown card
+    led.displayOnLED(input.gate, 'UNAUTHORIZED — Contacting security. Please wait.'),
+    ws.broadcastDeniedScan(input, '', ''),
   ]);
-  await gate.displayOnLED(
-    input.gate,
-    'UNAUTHORIZED — Contacting security. Please wait.'
-  );
 
   // ── STEP 2: Alert security / admin ───────────────────────
-  // Run email + audit log at the SAME TIME (in parallel)
-  // Promise.all([a, b]) = "start both, wait for BOTH to finish"
   await Promise.all([
     email.sendUnauthorizedAlert(input),
     db.writeAuditLog({
@@ -92,72 +73,71 @@ export async function wf3UnauthorizedApproval(
   ]);
 
   // ── STEP 3: Wait for security officer's decision ──────────
-  //
-  //  'let' because this variable WILL change when the signal arrives
-  //  SecurityDecision | null = either a decision object OR null
-  //  We start with null (no decision yet)
-  //
   let decision: SecurityDecision | null = null;
 
-  // When the securityDecisionSignal arrives, store the decision
   wf.setHandler(securityDecisionSignal, (incoming: SecurityDecision) => {
     decision = incoming;
   });
 
-  //  wf.condition(conditionFn, timeout)
-  //    conditionFn = a function that returns true when we should stop waiting
-  //    timeout     = '10 minutes' — if condition isn't met in 10 min, return false
-  //
-  //  decided = true  → security responded in time
-  //  decided = false → 10 minutes passed with no response (timeout)
-  //
   const decided = await wf.condition(
     () => decision !== null,
     '10 minutes'
   );
 
-  // ── STEP 4a: TIMEOUT — no decision in 10 minutes ─────────
-  if (!decided || decision === null) {
-    await db.writeAuditLog({
-      eventType:     'UNAUTHORIZED_TIMEOUT',
-      cardId:        input.cardId,
-      vehicleNumber: input.vehicleNumber,
-      gate:          input.gate,
-      timestamp:     input.timestamp,
-      notes:         'No security response within 10 minutes — entry denied',
-    });
-    // WF3 ends here, gate stays closed
-    return;
+  // Cast required: TypeScript can't narrow closure-mutated let variables
+  const finalDecision = decision as SecurityDecision | null;
+
+  // ── STEP 4a: TIMEOUT ──────────────────────────────────────
+  if (!decided || finalDecision === null) {
+    await Promise.all([
+      led.displayOnLED(input.gate, '✗ DENIED — No security response. Access not granted.'),
+      ws.broadcastDeniedResult(input, 'Timeout — no security response in 10 minutes'),
+      db.writeAuditLog({
+        eventType:     'UNAUTHORIZED_TIMEOUT',
+        cardId:        input.cardId,
+        vehicleNumber: input.vehicleNumber,
+        gate:          input.gate,
+        timestamp:     input.timestamp,
+        notes:         'No security response within 10 minutes — entry denied',
+      }),
+    ]);
+    return { approved: false };
   }
 
   // ── STEP 4b: DENIED by security ──────────────────────────
-  if (decision.action === 'deny') {
-    await db.writeAuditLog({
-      eventType:     'UNAUTHORIZED_DENIED_BY_SECURITY',
-      cardId:        input.cardId,
-      vehicleNumber: input.vehicleNumber,
-      gate:          input.gate,
-      timestamp:     input.timestamp,
-      notes:         `Denied by officer ${decision.officerId}. Reason: ${decision.reason ?? 'none'}`,
-    });
-    // WF3 ends here, gate stays closed
-    return;
+  if (finalDecision.action === 'deny') {
+    await Promise.all([
+      led.displayOnLED(input.gate, '✗ DENIED — Access refused by security.'),
+      ws.broadcastDeniedResult(input, `Denied by officer ${finalDecision.officerId}`),
+      db.writeAuditLog({
+        eventType:     'UNAUTHORIZED_DENIED_BY_SECURITY',
+        cardId:        input.cardId,
+        vehicleNumber: input.vehicleNumber,
+        gate:          input.gate,
+        timestamp:     input.timestamp,
+        notes:         `Denied by officer ${finalDecision.officerId}. Reason: ${finalDecision.reason ?? 'none'}`,
+      }),
+    ]);
+    return { approved: false };
   }
 
   // ── STEP 4c: APPROVED by security ────────────────────────
-  // Security officer approved this vehicle — open the gate
+  const vehicleNumber = finalDecision.vehicleNumber || input.vehicleNumber;
+  const companyName   = finalDecision.companyName   || '';
+  const reason        = finalDecision.reason        || 'Approved by security';
+
   await Promise.all([
-    gate.openGate(input.gate, input.vehicleNumber),
-    email.sendSecurityApprovalConfirm(input, decision),
+    led.displayOnLED(input.gate, `✓ ALLOWED — Welcome. Approved by security.`),
+    email.sendSecurityApprovalConfirm(input, finalDecision),
     db.writeAuditLog({
       eventType:     'UNAUTHORIZED_APPROVED_BY_SECURITY',
       cardId:        input.cardId,
-      vehicleNumber: input.vehicleNumber,
+      vehicleNumber,
       gate:          input.gate,
       timestamp:     input.timestamp,
-      notes:         `Approved by officer ${decision.officerId}. Reason: ${decision.reason ?? 'none'}`,
+      notes:         `Approved by ${finalDecision.officerId}. Vehicle: ${vehicleNumber}. Company: ${companyName}. Reason: ${reason}`,
     }),
   ]);
 
-  // WF3 ends here — vehicle was allowed in via security approval
+  return { approved: true };
 }

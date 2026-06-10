@@ -171,17 +171,28 @@ async function testWF3Approve(client: Client): Promise<TestResult> {
     });
 
     // Wait for lookupPersonnel activity to run and WF3 child to start
-    console.log(`  Waiting 6s for WF3 child to start...`);
-    await sleep(6_000);
+    console.log(`  Waiting 12s for WF3 child to start...`);
+    await sleep(12_000);
 
     // Send security APPROVE to WF3 (not WF1)
     console.log(`  Sending APPROVE signal to WF3...`);
     const wf3Handle = client.workflow.getHandle(wf3WorkflowId);
     await wf3Handle.signal(securityDecisionSignal, {
-      action: 'approve', officerId: 'TEST_SEC_001', reason: 'Automated test approval',
+      action: 'approve', officerId: 'TEST_SEC_001',
+      vehicleNumber: 'TEST 01 AA 0001', companyName: 'Test Visitor Co',
+      reason: 'Automated test approval',
     });
 
-    // WF1 completes when WF3 completes (executeChild)
+    // WF1 now continues after approve: starts WF2, waits for exit signal.
+    // Send exit signal after 5s so WF1 can complete.
+    console.log(`  Waiting 5s then sending exit signal to WF1...`);
+    await sleep(5_000);
+    try {
+      await wf1Handle.signal(exitSignal, {
+        timestamp: new Date().toISOString(), gate: 'GATE_1',
+      });
+    } catch { /* already completed */ }
+
     await withTimeout(wf1Handle.result(), 60_000, 'WF3 approve → WF1 completion');
 
     return {
@@ -190,10 +201,11 @@ async function testWF3Approve(client: Client): Promise<TestResult> {
         `WF1 triggered with card: ${cardId}`,
         'lookupPersonnel returned null → WF3 child started',
         `WF3 ID: ${wf3WorkflowId}`,
-        'APPROVE signal sent to WF3',
-        'gate.openGate() called',
-        'email.sendSecurityApprovalConfirm() called',
+        'APPROVE signal sent to WF3 (with vehicleNumber + companyName)',
+        'LED displayed: ✓ ALLOWED — Welcome. Approved by security.',
         'Audit log: UNAUTHORIZED_APPROVED_BY_SECURITY',
+        'WF1 continued after WF3 approve — started WF2 (overstay monitor)',
+        'Exit signal sent after 5s → WF1 completed entry→exit cycle',
         'WF3 + WF1 both completed',
       ],
     };
@@ -220,8 +232,8 @@ async function testWF3Deny(client: Client): Promise<TestResult> {
       args: [{ cardId, vehicleNumber: 'TEST 01 BB 0002', gate: 'GATE_1', timestamp, portNum: 1 }],
     });
 
-    console.log(`  Waiting 6s for WF3 child to start...`);
-    await sleep(6_000);
+    console.log(`  Waiting 12s for WF3 child to start...`);
+    await sleep(12_000);
 
     console.log(`  Sending DENY signal to WF3...`);
     const wf3Handle = client.workflow.getHandle(wf3WorkflowId);
@@ -323,9 +335,9 @@ async function testUIEndpoints(): Promise<TestResult> {
   const endpoints = [
     { path: '/api/vehicle-count',   label: 'StatsCards data  (/api/vehicle-count)'   },
     { path: '/api/vehicle-stats',   label: 'VehicleChart data (/api/vehicle-stats)'   },
-    { path: '/api/vehicle-type',    label: 'Vehicle type breakdown'                    },
+    { path: '/api/vehicle-type-count', label: 'Vehicle type breakdown'                  },
     { path: '/api/health/events',   label: 'Health events (RFID + lights)'             },
-    { path: '/api/occupancy',       label: 'Vehicles currently inside'                 },
+    { path: '/api/report/occupancy', label: 'Vehicles currently inside'                },
   ];
 
   for (const ep of endpoints) {

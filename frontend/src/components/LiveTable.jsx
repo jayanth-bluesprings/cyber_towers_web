@@ -185,7 +185,7 @@ export default function LiveTable({ onWsStatus }) {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [gateTab, setGateTab] = useState('all'); // 'all' | 'gate1' | 'gate2'
-  const [allowModal, setAllowModal] = useState({ open: false, record: null, remark: '', vehicleNo: '' });
+  const [allowModal, setAllowModal] = useState({ open: false, record: null, remark: '', vehicleNo: '', companyName: '' });
   const wsRef = useRef(null);
   const reconnectTimer = useRef(null);
 
@@ -267,31 +267,55 @@ export default function LiveTable({ onWsStatus }) {
       record,
       remark: existing?.remark || '',
       vehicleNo: existing?.vehicleNo || '',
+      companyName: existing?.companyName || '',
     });
   }
 
   function closeAllowModal() {
-    setAllowModal({ open: false, record: null, remark: '', vehicleNo: '' });
+    setAllowModal({ open: false, record: null, remark: '', vehicleNo: '', companyName: '' });
   }
 
-  function saveAllowRemark() {
+  async function saveAllowRemark() {
     const record = allowModal.record;
     const remark = String(allowModal.remark || '').trim();
     const vehicleNo = String(allowModal.vehicleNo || '').trim();
+    const companyName = String(allowModal.companyName || '').trim();
     if (!record || !remark || !vehicleNo) return;
 
     const key = getApprovalKey(record);
     if (!key) return;
+
+    // Save to local state for UI display
     setLocalApprovals((prev) => ({
       ...prev,
       [key]: {
         cardId: record.CardData || '',
         vehicleNo,
-        companyName: record.flatNumber || record.PCode || '',
+        companyName,
         remark,
         allowedAt: new Date().toISOString(),
       },
     }));
+
+    // Send real security decision signal to Temporal WF3
+    const workflowId = record.temporalWorkflowId || null;
+    try {
+      await fetch('/api/security-decision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workflowId,
+          cardId: record.CardData || '',
+          action: 'approve',
+          vehicleNumber: vehicleNo,
+          companyName,
+          reason: remark,
+        }),
+      });
+    } catch (err) {
+      console.warn('[Allow] Could not send Temporal signal:', err);
+    }
+
     closeAllowModal();
   }
 
@@ -648,9 +672,22 @@ export default function LiveTable({ onWsStatus }) {
               </div>
 
               <div>
-                <label className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Remark</label>
+                <label className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Company / Visiting Name <span className="font-normal text-slate-400">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={allowModal.companyName}
+                  onChange={(e) => setAllowModal((prev) => ({ ...prev, companyName: e.target.value }))}
+                  placeholder="Example: Google India, or visitor's company name"
+                  className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 outline-none focus:border-sky-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Reason for allowing <span className="text-red-400">*</span></label>
                 <textarea
-                  rows={4}
+                  rows={3}
                   value={allowModal.remark}
                   onChange={(e) => setAllowModal((prev) => ({ ...prev, remark: e.target.value }))}
                   placeholder="Example: Temporary visitor approved by security supervisor."

@@ -63,9 +63,11 @@ export interface CompanyQuota {
 // ─── SECURITY DECISION (used in WF3) ─────────────────────────
 // When the security officer approves or denies an unauthorized vehicle.
 export interface SecurityDecision {
-  action:      'approve' | 'deny';   // 'approve' = open gate, 'deny' = stay closed
-  officerId:   string;               // who made the decision
-  reason?:     string;               // optional reason text
+  action:         'approve' | 'deny'; // 'approve' = allow entry, 'deny' = stay denied
+  officerId:      string;             // who made the decision
+  vehicleNumber?: string;             // vehicle number filled in by security officer
+  companyName?:   string;             // company/visiting name (informational only)
+  reason?:        string;             // reason for the decision
 }
 
 // ─── ADMIN DECISION (used in WF9) ─────────────────────────────
@@ -90,6 +92,8 @@ export type AuditEventType =
   | 'OVERRIDE_DENIED'
   | 'OVERRIDE_TIMEOUT'
   | 'VEHICLE_EXIT'
+  | 'UNAUTHORIZED_ENTRY_STARTED'  // unauthorized vehicle approved — tracking started
+  | 'OVERRIDE_ENTRY_STARTED'      // override approved — tracking started
   // ── WF2 overstay event types ───────────────────────────
   | 'OVERSTAY_24H_ALERT'      // first alert — vehicle inside 24+ hours
   | 'OVERSTAY_ESCALATION'     // follow-up alerts at 32h, 40h

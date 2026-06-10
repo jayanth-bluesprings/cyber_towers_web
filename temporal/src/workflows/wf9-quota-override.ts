@@ -78,7 +78,7 @@ export async function wf9QuotaOverride(
   input:     EntryEvent,
   personnel: PersonnelRecord,
   quota:     CompanyQuota
-): Promise<void> {
+): Promise<{ approved: boolean }> {
 
   // Build a readable quota string like "10/10" for messages
   const quotaStr = `${quota.occupiedSlots}/${quota.totalSlots}`;
@@ -89,10 +89,9 @@ export async function wf9QuotaOverride(
   // personName + companyCode are included so it shows as "Authorized"
   // (the person IS valid — just their company quota is full).
   await Promise.all([
-    gate.denyGate(input.gate, `QUOTA FULL ${quotaStr}`),
     gate.displayOnLED(
       input.gate,
-      `Company Parking FULL ${quotaStr} — Please park outside`
+      `✗ PARKING FULL ${quotaStr} — Please park outside.`
     ),
     ws.broadcastDeniedScan(input, personnel.pName, personnel.pCode),
   ]);
@@ -144,7 +143,7 @@ export async function wf9QuotaOverride(
       pName:         personnel.pName,
       notes:         'No override requested within 5 minutes — vehicle parks outside',
     });
-    return; // WF9 ends quietly — vehicle parks outside
+    return { approved: false }; // WF9 ends quietly — vehicle parks outside
   }
 
   // ── STEP 4: Override was requested — email Company Admin ──
@@ -174,14 +173,17 @@ export async function wf9QuotaOverride(
     '5 minutes'
   );
 
+  // Cast required: TypeScript can't narrow closure-mutated let variables
+  const finalDecision = adminDecision as AdminDecision | null;
+
   // ── ADMIN DENIED or TIMED OUT ─────────────────────────────
-  if (!decidedInTime || adminDecision === null || adminDecision.action === 'deny') {
+  if (!decidedInTime || finalDecision === null || finalDecision.action === 'deny') {
     const notes = !decidedInTime
       ? 'Admin did not respond within 5 minutes — auto-denied'
-      : `Denied by admin ${adminDecision?.adminId ?? 'unknown'}`;
+      : `Denied by admin ${finalDecision?.adminId ?? 'unknown'}`;
 
     await Promise.all([
-      email.sendOverrideResult(input, personnel, adminDecision ?? { action: 'deny', adminId: 'SYSTEM' }),
+      email.sendOverrideResult(input, personnel, finalDecision ?? { action: 'deny', adminId: 'SYSTEM' }),
       db.writeAuditLog({
         eventType:     'OVERRIDE_DENIED',
         cardId:        input.cardId,
@@ -193,15 +195,15 @@ export async function wf9QuotaOverride(
         notes,
       }),
     ]);
-    return; // WF9 ends — gate stays closed
+    return { approved: false }; // WF9 ends — access denied
   }
 
   // ── ADMIN APPROVED ────────────────────────────────────────
-  // Open the gate — this is an over-quota entry.
+  // Show LED allowed message — over-quota entry approved.
   // The count goes above total (e.g. 10/10 → 11/10).
   await Promise.all([
-    gate.openGate(input.gate, input.vehicleNumber),
-    email.sendOverrideResult(input, personnel, adminDecision),
+    gate.displayOnLED(input.gate, `✓ ALLOWED — Welcome, ${personnel.pName}. Override approved.`),
+    email.sendOverrideResult(input, personnel, finalDecision),
     db.writeAuditLog({
       eventType:     'OVERRIDE_APPROVED',
       cardId:        input.cardId,
@@ -210,9 +212,9 @@ export async function wf9QuotaOverride(
       timestamp:     input.timestamp,
       companyCode:   personnel.pCode,
       pName:         personnel.pName,
-      notes:         `Approved by admin ${adminDecision.adminId} — over quota entry. Quota was ${quotaStr}`,
+      notes:         `Approved by admin ${finalDecision.adminId} — over quota entry. Quota was ${quotaStr}`,
     }),
   ]);
 
-  // WF9 ends — override approved, vehicle entered above quota
+  return { approved: true }; // WF9 ends — override approved, vehicle entered above quota
 }

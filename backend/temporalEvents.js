@@ -66,12 +66,34 @@ function buildSessions(fromMs, toMs) {
     while (i < sorted.length) {
       const ev = sorted[i];
       if (ev.type === 'ENTRY') {
-        // Find the next EXIT for this card
-        let nextExitIdx = -1;
+        // Find the next EXIT or DENIED for this card
+        let nextExitIdx  = -1;
+        let nextDeniedIdx = -1;
         for (let j = i + 1; j < sorted.length; j++) {
-          if (sorted[j].type === 'EXIT') { nextExitIdx = j; break; }
+          if (sorted[j].type === 'EXIT'   && nextExitIdx  < 0) nextExitIdx  = j;
+          if (sorted[j].type === 'DENIED' && nextDeniedIdx < 0) nextDeniedIdx = j;
+          if (nextExitIdx >= 0 && nextDeniedIdx >= 0) break;
         }
+
+        // Pick whichever comes first (exit or denied)
         const nextExit = nextExitIdx >= 0 ? sorted[nextExitIdx] : null;
+        const nextDenied = nextDeniedIdx >= 0 ? sorted[nextDeniedIdx] : null;
+
+        let status = 'Still Inside';
+        let exitTime = null;
+        let exitGate = null;
+        let nextConsumed = i + 1;
+
+        if (nextExit && (!nextDenied || nextExit.timestampMs <= nextDenied.timestampMs)) {
+          status = 'Exited';
+          exitTime = nextExit.timestamp;
+          exitGate = nextExit.gate;
+          nextConsumed = nextExitIdx + 1;
+        } else if (nextDenied) {
+          status = 'Access Denied';
+          nextConsumed = nextDeniedIdx + 1;
+        }
+
         sessions.push({
           CardData:      cardId,
           PName:         ev.personName  || ev.vehicleNumber || cardId,
@@ -79,14 +101,31 @@ function buildSessions(fromMs, toMs) {
           PersonnelID:   null,
           EntryTime:     ev.timestamp,
           EntryGate:     ev.gate,
-          ExitTime:      nextExit ? nextExit.timestamp : null,
-          ExitGate:      nextExit ? nextExit.gate      : null,
-          Status:        nextExit ? 'Exited' : 'Still Inside',
+          ExitTime:      exitTime,
+          ExitGate:      exitGate,
+          Status:        status,
           Addr:          ev.companyCode || null,
           VehicleType:   null,
           Authorization: ev.companyCode ? 'Authorized' : 'Unauthorized',
         });
-        i = nextExitIdx >= 0 ? nextExitIdx + 1 : i + 1;
+        i = nextConsumed;
+      } else if (ev.type === 'DENIED') {
+        // Standalone DENIED with no preceding ENTRY — show as denied scan
+        sessions.push({
+          CardData:      cardId,
+          PName:         ev.personName  || ev.vehicleNumber || cardId,
+          PCode:         ev.companyCode || '',
+          PersonnelID:   null,
+          EntryTime:     ev.timestamp,
+          EntryGate:     ev.gate,
+          ExitTime:      null,
+          ExitGate:      null,
+          Status:        'Access Denied',
+          Addr:          ev.companyCode || null,
+          VehicleType:   null,
+          Authorization: 'Unauthorized',
+        });
+        i++;
       } else {
         i++;
       }

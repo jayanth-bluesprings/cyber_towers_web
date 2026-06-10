@@ -187,3 +187,32 @@ export async function broadcastDeniedScan(
 
   await postToBackend('/internal/parking-update', payload);
 }
+
+// ─── ACTIVITY: broadcastDeniedResult ─────────────────────────
+//
+//  Called by WF3 when security DENIES access or the 10-minute timeout
+//  fires. Posts a DENIED event so temporalEvents.buildSessions() can
+//  show "Access Denied" instead of "Still Inside" in Reports.
+//
+export async function broadcastDeniedResult(
+  event:  EntryEvent,
+  reason: string
+): Promise<void> {
+  const payload = {
+    type:             'DENIED',
+    vehicleNumber:    event.vehicleNumber,
+    cardId:           event.cardId,
+    gate:             event.gate,
+    timestamp:        event.timestamp,
+    personName:       '',
+    companyCode:      '',
+    companyName:      '',
+    occupiedSlots:    0,
+    totalSlots:       0,
+    occupancyPercent: 0,
+    reason,
+  };
+
+  console.log(`[WS-Broadcast] DENIED — ${event.vehicleNumber} | ${reason}`);
+  await postToBackend('/internal/parking-update', payload);
+}
