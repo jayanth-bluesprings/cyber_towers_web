@@ -567,46 +567,45 @@ export const DUMMY_LOCAL_APPROVALS = {
 // ─── LocalStorage Initialiser ─────────────────────────────────────────────────
 
 export function initDummyLocalStorage() {
-  // Always ensure all 10 dummy companies are present; keep any user-added ones on top
+  // CLEAR live entry/exit records — real data comes from the API (CardRecord table in TimeWatch DB).
+  // We remove any previously stored dummy records so the live page starts fresh
+  // and only shows real scans fetched from the backend.
+  try {
+    localStorage.removeItem('vehicleAccess.entryExitRecords.v1');
+  } catch {
+    // ignore
+  }
+
+  // CLEAR dummy local approvals — those were for fake card IDs that don't exist in TimeWatch.
+  // Real approvals will be created by the security guard through the dashboard UI.
+  try {
+    localStorage.removeItem('vehicleAccess.localApprovals.v1');
+  } catch {
+    // ignore
+  }
+
+  // Keep registered companies — useful for company name display and configuration.
+  // Only seed if no companies exist yet; never overwrite user-added companies.
   try {
     const stored = localStorage.getItem('registeredCompanies');
     const existing = stored ? JSON.parse(stored) : [];
-    const dummyIds = new Set(DUMMY_COMPANIES.map((c) => c.id));
-    const userAdded = Array.isArray(existing) ? existing.filter((c) => !dummyIds.has(c.id)) : [];
-    localStorage.setItem('registeredCompanies', JSON.stringify([...DUMMY_COMPANIES, ...userAdded]));
+    if (!Array.isArray(existing) || existing.length === 0) {
+      localStorage.setItem('registeredCompanies', JSON.stringify(DUMMY_COMPANIES));
+    }
   } catch {
     localStorage.setItem('registeredCompanies', JSON.stringify(DUMMY_COMPANIES));
   }
 
-  // Always reset live entry/exit records to dummy data — clears stale accumulated records
-  try {
-    localStorage.setItem('vehicleAccess.entryExitRecords.v1', JSON.stringify(DUMMY_LIVE_RECORDS));
-  } catch {
-    // ignore quota errors
-  }
-
-  // Always reset parking allocations so old physical-slot format (P-A101) is replaced
-  // with the new readable format (CompanyName PS-N/Total)
+  // Keep parking allocations only if user has already set them up.
+  // Don't overwrite real parking assignments with dummy data.
   try {
     const stored = localStorage.getItem('vehicleAccess.parkingAllocations.v1');
     const parsed = stored ? JSON.parse(stored) : null;
-    // Detect stale format: old P-A101 style, old company names, or incomplete allocation (< 25 entries)
-    const space0 = Array.isArray(parsed) && parsed.length > 0 ? String(parsed[0].parkingSpace || '') : '';
-    const isStaleFormat = /^P-[A-Z]/.test(space0) || /^TechMahindra|^Infosys Technologies|^Wipro Ltd|^HCL|^Accenture|^Capgemini|^IBM India|^Deloitte Consulting/.test(space0);
-    const isIncomplete = Array.isArray(parsed) && parsed.length < DUMMY_PARKING_ALLOCATIONS.length;
-    if (!Array.isArray(parsed) || parsed.length === 0 || isStaleFormat || isIncomplete) {
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      // Only seed dummy allocations if the user has none at all
       localStorage.setItem('vehicleAccess.parkingAllocations.v1', JSON.stringify(DUMMY_PARKING_ALLOCATIONS));
     }
   } catch {
-    localStorage.setItem('vehicleAccess.parkingAllocations.v1', JSON.stringify(DUMMY_PARKING_ALLOCATIONS));
-  }
-
-  // Seed local approvals (reasons for allowed unauthorized vehicles) only if none exist
-  try {
-    if (!localStorage.getItem('vehicleAccess.localApprovals.v1')) {
-      localStorage.setItem('vehicleAccess.localApprovals.v1', JSON.stringify(DUMMY_LOCAL_APPROVALS));
-    }
-  } catch {
-    // ignore
+    // ignore — don't overwrite if parse fails
   }
 }

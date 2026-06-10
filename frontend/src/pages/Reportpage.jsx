@@ -1,7 +1,14 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Navbar from '../components/Navbar.jsx';
-import { DUMMY_REPORT_SESSIONS } from '../data/dummyData.js';
+import { fetchReportRecords } from '../api/index.js';
 import { loadLocalAccessApprovals } from '../utils/localAccessApprovalsStorage.js';
+
+function defaultDateRange() {
+  const today = new Date();
+  const d30 = new Date(today);
+  d30.setDate(today.getDate() - 29);
+  return { from: formatInputDate(d30), to: formatInputDate(today) };
+}
 
 const DEFAULT_FILTERS = { from: '', to: '', type: '', search: '', status: '', authorization: '' };
 const QUICK_RANGES = [
@@ -29,24 +36,31 @@ function getQuickRange(rangeKey) {
   return { from: formatInputDate(start), to: end };
 }
 
+// All timestamps use "IST wall-clock as fake UTC" convention (matching the TimeWatch DB).
+// Strip Z to prevent UTC reinterpretation, then append +05:30 to parse as IST explicitly.
+// timeZone: 'Asia/Kolkata' ensures correct display regardless of browser timezone.
+function toISTDate(value) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  const noZ = raw.endsWith('Z') ? raw.slice(0, -1) : raw;
+  const date = new Date(noZ + '+05:30');
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function formatDateTime(value) {
   if (!value) return '-';
   const raw = String(value).trim();
-  const normalized = raw.endsWith('Z') ? raw.slice(0, -1) : raw;
-  const date = new Date(normalized);
-  if (Number.isNaN(date.getTime())) return raw;
+  const date = toISTDate(raw);
+  if (!date) return raw;
   return date.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit', hour12: false,
   });
 }
 
 function toDate(value) {
-  if (!value) return null;
-  const raw = String(value).trim();
-  const normalized = raw.endsWith('Z') ? raw.slice(0, -1) : raw;
-  const date = new Date(normalized);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return toISTDate(value);
 }
 
 function formatDuration(entryTime, exitTime) {
@@ -264,19 +278,34 @@ function Pagination({ page, totalPages, onChange }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ReportPage({ dark, setDark, onNavigate, onLogout, activePage = 'report' }) {
-  const [filters,       setFilters]       = useState(DEFAULT_FILTERS);
-  const [page,          setPage]          = useState(1);
-  const [quickRange,    setQuickRange]    = useState('');
+  const [filters,        setFilters]        = useState(() => ({ ...DEFAULT_FILTERS, ...defaultDateRange() }));
+  const [page,           setPage]           = useState(1);
+  const [quickRange,     setQuickRange]     = useState('');
   const [localApprovals] = useState(() => loadLocalAccessApprovals());
+  const [sessions,       setSessions]       = useState([]);
+  const [loading,        setLoading]        = useState(false);
+  const [fetchError,     setFetchError]     = useState('');
 
-  const filteredAll = useMemo(() => applyFilters(DUMMY_REPORT_SESSIONS, filters), [filters]);
+  useEffect(() => {
+    setLoading(true);
+    setFetchError('');
+    const params = { all: true };
+    if (filters.from) params.from = filters.from;
+    if (filters.to)   params.to   = filters.to;
+    fetchReportRecords(params)
+      .then(res => setSessions(res?.data?.records ?? []))
+      .catch(err => setFetchError(err.message))
+      .finally(() => setLoading(false));
+  }, [filters.from, filters.to]);
+
+  const filteredAll = useMemo(() => applyFilters(sessions, filters), [sessions, filters]);
 
   const total      = filteredAll.length;
   const totalPages = Math.max(1, Math.ceil(total / LIMIT));
   const pageRecords = filteredAll.slice((page - 1) * LIMIT, page * LIMIT);
 
   const resetFilters = useCallback(() => {
-    setFilters(DEFAULT_FILTERS);
+    setFilters({ ...DEFAULT_FILTERS, ...defaultDateRange() });
     setPage(1);
     setQuickRange('');
   }, []);
@@ -425,7 +454,19 @@ export default function ReportPage({ dark, setDark, onNavigate, onLogout, active
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {pageRecords.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={10} className="px-4 py-12 text-center text-sm text-slate-400">
+                      Loading records…
+                    </td>
+                  </tr>
+                ) : fetchError ? (
+                  <tr>
+                    <td colSpan={10} className="px-4 py-12 text-center text-sm text-red-500">
+                      Failed to load: {fetchError}
+                    </td>
+                  </tr>
+                ) : pageRecords.length === 0 ? (
                   <tr>
                     <td colSpan={10} className="px-4 py-12 text-center text-sm text-slate-400">
                       No sessions found for the selected filters.

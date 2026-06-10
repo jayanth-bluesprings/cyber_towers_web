@@ -1,0 +1,32 @@
+{
+  "name": "cyber-towers-temporal",
+  "version": "1.0.0",
+  "description": "Temporal workflows for Cyber Towers Vehicle Access Dashboard",
+  "scripts": {
+    "build": "tsc --build",
+    "worker:dev": "ts-node --project tsconfig.json src/worker.ts",
+    "worker": "node lib/worker.js",
+    "create-schedule": "ts-node --project tsconfig.json src/schedules/create-schedule.ts",
+    "create-weekly-schedule": "ts-node --project tsconfig.json src/schedules/create-weekly-schedule.ts",
+    "trigger-weekly-now": "ts-node --project tsconfig.json src/schedules/trigger-weekly-now.ts",
+    "trigger-daily-now":  "ts-node --project tsconfig.json src/schedules/trigger-daily-now.ts",
+    "simulate":           "ts-node --project tsconfig.json src/simulate-scan.ts",
+    "test-workflows":     "ts-node --project tsconfig.json src/test-all-workflows.ts"
+  },
+  "dependencies": {
+    "@temporalio/activity": "^1.10.0",
+    "@temporalio/client":   "^1.10.0",
+    "@temporalio/worker":   "^1.10.0",
+    "@temporalio/workflow":  "^1.10.0",
+    "dotenv":       "^16.3.1",
+    "mssql":        "^10.0.1",
+    "nodemailer":   "^6.9.7"
+  },
+  "devDependencies": {
+    "@types/node":       "^20.11.0",
+    "@types/nodemailer": "^6.4.14",
+    "@types/mssql":      "^9.1.3",
+    "ts-node":           "^10.9.2",
+    "typescript":        "^5.3.3"
+  }
+}

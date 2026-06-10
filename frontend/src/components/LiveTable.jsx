@@ -9,10 +9,11 @@ function formatTime(scanTime) {
   if (!scanTime) return '-';
   try {
     const raw = String(scanTime).trim();
-    const normalized = raw.endsWith('Z') ? raw.slice(0, -1) : raw;
-    const d = new Date(normalized);
+    const noZ = raw.endsWith('Z') ? raw.slice(0, -1) : raw;
+    const d = new Date(noZ + '+05:30');
     if (Number.isNaN(d.getTime())) return raw;
     return d.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -22,7 +23,7 @@ function formatTime(scanTime) {
       hour12: false,
     });
   } catch {
-    return scanTime;
+    return String(scanTime);
   }
 }
 

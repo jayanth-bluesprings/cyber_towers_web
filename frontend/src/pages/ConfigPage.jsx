@@ -4,7 +4,6 @@ import Navbar from '../components/Navbar.jsx';
 import { fetchAuthorizedVehicles, WS_URL } from '../api/index.js';
 import { loadParkingAllocations, saveParkingAllocations } from '../utils/parkingStorage.js';
 import { loadRegisteredVehiclesState, saveRegisteredVehiclesState } from '../utils/registeredVehiclesStorage.js';
-import { DUMMY_COMPANIES } from '../data/dummyData.js';
 
 function normalize(value) {
   if (value == null) return '';
@@ -77,22 +76,15 @@ function loadCompanies() {
   try {
     const stored = localStorage.getItem('registeredCompanies');
     const parsed = stored ? JSON.parse(stored) : [];
-    const existing = Array.isArray(parsed) ? parsed : [];
-    // Always guarantee all 10 dummy companies are present
-    const dummyIds = new Set(DUMMY_COMPANIES.map((c) => c.id));
-    const userAdded = existing.filter((c) => !dummyIds.has(c.id));
-    return [...DUMMY_COMPANIES, ...userAdded];
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return DUMMY_COMPANIES;
+    return [];
   }
 }
 
 function saveCompanies(list) {
   try {
-    // Always persist dummy companies + user-added ones
-    const dummyIds = new Set(DUMMY_COMPANIES.map((c) => c.id));
-    const userAdded = list.filter((c) => !dummyIds.has(c.id));
-    localStorage.setItem('registeredCompanies', JSON.stringify([...DUMMY_COMPANIES, ...userAdded]));
+    localStorage.setItem('registeredCompanies', JSON.stringify(list));
   } catch {
     // ignore
   }
@@ -494,7 +486,7 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
                   filteredVehicles.map((vehicle) => (
                     <tr key={vehicle.CardData} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
                       <td className="px-4 py-3 font-mono text-xs">{vehicle.CardData}</td>
-                      <td className="px-4 py-3">{vehicle.PName || '-'}</td>
+                      <td className="px-4 py-3">{vehicle.CarNumber || vehicle.PName || '-'}</td>
                       <td className="px-4 py-3 text-xs text-slate-700 dark:text-slate-300">{getCompanyName(vehicle.Addr)}</td>
                       <td className="px-4 py-3">{vehicle.vehicleType || '-'}</td>
                       <td className="px-4 py-3">{vehicle.BloodGroup || '-'}</td>

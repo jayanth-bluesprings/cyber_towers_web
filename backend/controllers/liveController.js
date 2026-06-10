@@ -111,11 +111,29 @@ async function search(req, res) {
 async function getAuthorizedVehicles(req, res) {
   try {
     const personnelMap = await getPersonnelMap();
-    const uniqueRecords = new Map();
-    for (const record of personnelMap.values()) {
-        uniqueRecords.set(record.PersonnelID, record);
-    }
-    const records = Array.from(uniqueRecords.values());
+
+    // Query unique card holders from CardRecord — this table always has real data
+    // because every scan is recorded here. We group by CardData to get one row
+    // per unique card, taking the most recent PName and PCode for each.
+    const result = await query(`
+      SET NOCOUNT ON;
+      SELECT TOP 3000
+        CardData,
+        MAX(PName)        AS PName,
+        MAX(PCode)        AS PCode,
+        MAX(DeptName)     AS DeptName,
+        MAX(PersonnelID)  AS PersonnelID
+      FROM CardRecord WITH (NOLOCK)
+      WHERE CardData IS NOT NULL
+        AND CardData != ''
+        AND CardData != '0'
+      GROUP BY CardData
+      ORDER BY MAX(CardRecordID) DESC
+    `);
+
+    // enrichWithCache adds CarNumber, BloodGroup, vehicleType, Addr from the
+    // Personnel / PersonnelExtend2 tables where that data exists.
+    const records = result.recordset.map(r => enrichWithCache(r, personnelMap));
     res.json({ success: true, data: records });
   } catch (err) {
     console.error('getAuthorizedVehicles error:', err.message);

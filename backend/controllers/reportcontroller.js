@@ -1,6 +1,7 @@
 const { query } = require('../db');
 const { getLocalTimeWindows } = require('./statsController');
 const { getPersonnelMap } = require('../personnelCache');
+const temporalEvents = require('../temporalEvents');
 
 const DEDUP_SECONDS = 30;
 
@@ -185,6 +186,14 @@ async function getReportRecords(req, res) {
       };
     });
 
+    // Prepend Temporal in-memory sessions so simulator scans appear in the report
+    const fromMs = resolvedStart ? new Date(resolvedStart).getTime() : 0;
+    const toMs   = resolvedEnd   ? new Date(resolvedEnd).getTime() + 86400000 : Infinity;
+    const tSessions = temporalEvents.buildSessions(fromMs, toMs);
+    if (tSessions.length > 0) {
+      records = [...tSessions, ...records];
+    }
+
     // Apply Search Filter (in-memory since session logic is complex)
     if (search) {
       const s = search.toLowerCase();
@@ -302,7 +311,7 @@ async function getVehicleOccupancy(req, res) {
 
         const inside = allRecords.filter(r => r.Status === 'Still Inside');
         const outside = allRecords.filter(r => r.Status === 'Exited');
-        
+
         const now = new Date();
         const overstay = inside.filter(r => {
             const entryDate = new Date(r.EntryTimeRaw);
@@ -311,13 +320,31 @@ async function getVehicleOccupancy(req, res) {
             return (nowLocalAsUtc - entryTimeLocalAsUtc) / (1000 * 60 * 60) > 24;
         });
 
+        // Merge Temporal in-memory "Still Inside" sessions
+        const sevenDaysAgo = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+        const tSessions = temporalEvents.buildSessions(sevenDaysAgo);
+        const tInside = tSessions
+          .filter(s => s.Status === 'Still Inside')
+          .map(s => ({
+            ...s,
+            EntryTimeRaw: s.EntryTime,
+            VehicleType: null,
+          }));
+
+        const allInsideRecords  = [...inside, ...tInside];
+        const allOutsideRecords = outside;
+        const allRecordsWithT   = [...allRecords, ...tInside];
+
         res.json({
             success: true,
             data: {
-                insideCount: inside.length,
-                outsideCount: outside.length,
+                insideCount:  allInsideRecords.length,
+                outsideCount: allOutsideRecords.length,
                 overstayCount: overstay.length,
-                records: status === 'inside' ? inside : status === 'outside' ? outside : status === 'overstay' ? overstay : allRecords
+                records: status === 'inside'   ? allInsideRecords
+                       : status === 'outside'  ? allOutsideRecords
+                       : status === 'overstay' ? overstay
+                       : allRecordsWithT
             }
         });
     } catch (err) {

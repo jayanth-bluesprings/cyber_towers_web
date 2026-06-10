@@ -11,10 +11,15 @@ function formatTime(scanTime) {
   if (!scanTime) return '-';
   try {
     const raw = String(scanTime).trim();
-    const normalized = raw.endsWith('Z') ? raw.slice(0, -1) : raw;
-    const d = new Date(normalized);
+    // All ScanTime values use "IST wall-clock as fake UTC" convention (matching the
+    // TimeWatch DB). Strip the Z so JavaScript does not reinterpret the value as true
+    // UTC, then append +05:30 to parse the wall-clock value as IST explicitly.
+    // Using timeZone: 'Asia/Kolkata' ensures correct display on any browser timezone.
+    const noZ = raw.endsWith('Z') ? raw.slice(0, -1) : raw;
+    const d = new Date(noZ + '+05:30');
     if (Number.isNaN(d.getTime())) return raw;
     return d.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
       day: '2-digit',
       month: 'short',
       year: 'numeric',
@@ -332,6 +337,16 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
             setTimeout(() => {
               setNewIds((prev) => { const n = new Set(prev); ids.forEach((id) => n.delete(id)); return n; });
             }, 4000);
+          }
+          // WF7 parking update — real-time slot count from Temporal workflow
+          if (msg.type === 'parkingUpdate' && msg.data) {
+            const d = msg.data;
+            console.log(`[WF7] ${d.type} — ${d.companyName || d.companyCode}: ${d.occupiedSlots}/${d.totalSlots} slots`);
+          }
+          // Gate command — open/deny/LED from Temporal workflow
+          if (msg.type === 'gateCommand' && msg.data) {
+            const d = msg.data;
+            console.log(`[Gate] ${d.command} → ${d.gate} | "${d.message}"`);
           }
         } catch { /**/ }
       };

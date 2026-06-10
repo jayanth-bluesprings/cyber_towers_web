@@ -1,98 +1,95 @@
-import {
-  DUMMY_LIVE_RECORDS,
-  DUMMY_AUTHORIZED_VEHICLES,
-  DUMMY_VEHICLE_COUNT,
-  getDummyVehicleStats,
-  DUMMY_VEHICLE_TYPE_COUNT,
-  DUMMY_OCCUPANCY_SUMMARY,
-  getDummyOccupancyRecords,
-  DUMMY_24H_ALERT,
-} from '../data/dummyData.js';
+const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+const API_KEY  = import.meta.env.VITE_API_KEY || '';
 
-// No real WebSocket in demo mode — setting null so components skip connection
-export const WS_URL = null;
+export const WS_URL = BASE_URL.replace(/^https/, 'wss').replace(/^http/, 'ws');
+
+function buildHeaders() {
+  const h = {};
+  if (API_KEY) h['X-API-Key'] = API_KEY;
+  return h;
+}
+
+function buildUrl(path, params = {}) {
+  const url = new URL(`${BASE_URL}${path}`);
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, String(v));
+  });
+  return url.toString();
+}
+
+async function apiFetch(path, params = {}) {
+  const res = await fetch(buildUrl(path, params), { headers: buildHeaders() });
+  if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
+  return res.json();
+}
 
 // ─── Live Records ─────────────────────────────────────────────────────────────
 
 export function fetchLive(params = {}) {
-  let records = [...DUMMY_LIVE_RECORDS];
-
-  if (params.startDate) {
-    records = records.filter(r => r.ScanTime >= params.startDate);
-  }
-  if (params.endDate) {
-    records = records.filter(r => r.ScanTime <= params.endDate + 'T23:59:59');
-  }
-
-  return Promise.resolve({ data: records });
+  return apiFetch('/api/live', {
+    startDate: params.startDate,
+    endDate:   params.endDate,
+  });
 }
 
-export function fetchNew() {
-  return Promise.resolve({ data: [] });
+export function fetchNew(lastId) {
+  return apiFetch('/api/new', { lastId });
 }
 
 export function fetchSearch(q, params = {}) {
-  if (!q) return Promise.resolve({ data: DUMMY_LIVE_RECORDS });
-
-  const term = String(q).trim().toLowerCase();
-  let results = DUMMY_LIVE_RECORDS.filter(r =>
-    String(r.CardData || '').toLowerCase().includes(term) ||
-    String(r.PName || '').toLowerCase().includes(term) ||
-    String(r.flatNumber || '').toLowerCase().includes(term) ||
-    String(r.vehicleType || '').toLowerCase().includes(term)
-  );
-
-  if (params.startDate) results = results.filter(r => r.ScanTime >= params.startDate);
-  if (params.endDate)   results = results.filter(r => r.ScanTime <= params.endDate + 'T23:59:59');
-
-  return Promise.resolve({ data: results });
+  return apiFetch('/api/search', {
+    q,
+    startDate: params.startDate,
+    endDate:   params.endDate,
+  });
 }
 
 // ─── Config / Authorized Vehicles ────────────────────────────────────────────
 
 export function fetchAuthorizedVehicles() {
-  return Promise.resolve({ data: DUMMY_AUTHORIZED_VEHICLES });
+  return apiFetch('/api/authorized-vehicles');
 }
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
 export function fetchVehicleStats(period = 'day') {
-  return Promise.resolve({ data: getDummyVehicleStats(period) });
+  return apiFetch('/api/vehicle-stats', { period });
 }
 
 export function fetchVehicleTypeCount() {
-  return Promise.resolve({ data: DUMMY_VEHICLE_TYPE_COUNT });
+  return apiFetch('/api/vehicle-type-count');
 }
 
 export function fetchVehicleCount() {
-  return Promise.resolve(DUMMY_VEHICLE_COUNT);
+  return apiFetch('/api/vehicle-count');
 }
 
 // ─── Occupancy ────────────────────────────────────────────────────────────────
 
 export function fetchVehicleOccupancy(status = '') {
-  if (!status) {
-    return Promise.resolve({ data: DUMMY_OCCUPANCY_SUMMARY });
-  }
-  return Promise.resolve({ data: { records: getDummyOccupancyRecords(status) } });
+  return apiFetch('/api/report/occupancy', { status });
+}
+
+// ─── Report Records ───────────────────────────────────────────────────────────
+
+export function fetchReportRecords(params = {}) {
+  return apiFetch('/api/report/records', params);
 }
 
 // ─── 24h Alert ────────────────────────────────────────────────────────────────
 
 export function fetchTrigger24hAlert() {
-  return Promise.resolve({ data: DUMMY_24H_ALERT });
+  return apiFetch('/api/alerts/trigger-24h');
 }
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 
 export function fetchHealthEvents() {
-  return Promise.resolve({
-    data: {
-      rfidCount: 29,
-      lightCount: 29,
-      mismatch: 0,
-    },
-  });
+  return apiFetch('/api/health/events');
 }
 
-export default { fetchLive, fetchNew, fetchSearch, fetchAuthorizedVehicles, fetchVehicleStats, fetchVehicleTypeCount, fetchVehicleCount, fetchVehicleOccupancy, fetchTrigger24hAlert, fetchHealthEvents };
+export default {
+  fetchLive, fetchNew, fetchSearch, fetchAuthorizedVehicles,
+  fetchVehicleStats, fetchVehicleTypeCount, fetchVehicleCount,
+  fetchVehicleOccupancy, fetchReportRecords, fetchTrigger24hAlert, fetchHealthEvents,
+};

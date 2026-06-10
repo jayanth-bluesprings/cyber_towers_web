@@ -36,10 +36,10 @@ async function getPool() {
   return pool;
 }
 
-async function query(queryString, params = {}) {
+async function query(queryString, params = {}, { silent = false } = {}) {
   const p = await getPool();
   const request = p.request();
-  
+
   if (params) {
     for (const [key, value] of Object.entries(params)) {
       request.input(key, value);
@@ -56,7 +56,9 @@ async function query(queryString, params = {}) {
     }
     return result;
   } catch (err) {
-    console.error(`❌ Query Error: ${err.message}\nQuery Summary: ${queryString.substring(0, 100)}`);
+    if (!silent) {
+      console.error(`❌ Query Error: ${err.message}\nQuery Summary: ${queryString.substring(0, 100)}`);
+    }
     throw err;
   }
 }

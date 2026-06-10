@@ -2,6 +2,13 @@ const { query } = require('../db');
 const path = require('path');
 const fs = require('fs');
 const { getPersonnelMap, enrichWithCache } = require('../personnelCache');
+const temporalEvents = require('../temporalEvents');
+
+// Access serial date epoch → UTC milliseconds
+const ACCESS_EPOCH_MS = Date.UTC(1899, 11, 30, 0, 0, 0);
+const floatToMs = f => f * 86400000 + ACCESS_EPOCH_MS;
+// IST is UTC+5:30
+const IST_OFFSET_MS = 330 * 60 * 1000;
 
 const DEDUP_SECONDS = 60; // Must match frontend DEDUP_SECONDS in LiveEntryExitPage.jsx / LiveTable.jsx
 
@@ -141,6 +148,21 @@ async function getVehicleStats(req, res) {
           }
         }
       }
+      // Merge Temporal events into hourly buckets
+      const dayStartMs = floatToMs(times.dayStartFloat);
+      const dayEndMs   = floatToMs(times.nextDayStartFloat);
+      for (const ev of temporalEvents.getAll()) {
+        const ms = ev.timestampMs;
+        if (ms < dayStartMs || ms >= dayEndMs) continue;
+        // Use IST hour to match DB's ScanHour (which stores IST wall-clock as UTC)
+        const h = new Date(ms + IST_OFFSET_MS).getUTCHours();
+        if (byHour.has(h)) {
+          const bucket = byHour.get(h);
+          if (ev.type === 'ENTRY') bucket.entry++;
+          else if (ev.type === 'EXIT') bucket.exit++;
+        }
+      }
+
       return res.json({ success: true, data: Array.from(byHour.entries()).map(([hour, counts]) => ({ hour, ...counts })) });
     } else {
       const byDay = new Map();
@@ -167,6 +189,19 @@ async function getVehicleStats(req, res) {
           else if (r.vehicleType === '4W') bucket.fourWheelerExit++;
         }
       }
+
+      // Merge Temporal events into daily buckets
+      const rangeStartMs = floatToMs(rangeStartFloat);
+      for (const ev of temporalEvents.getAll()) {
+        const ms = ev.timestampMs;
+        if (ms < rangeStartMs) continue;
+        const day = new Date(ms + IST_OFFSET_MS).toISOString().slice(0, 10);
+        if (!byDay.has(day)) byDay.set(day, { entry: 0, exit: 0, twoWheelerEntry: 0, twoWheelerExit: 0, fourWheelerEntry: 0, fourWheelerExit: 0 });
+        const bucket = byDay.get(day);
+        if (ev.type === 'ENTRY') bucket.entry++;
+        else if (ev.type === 'EXIT') bucket.exit++;
+      }
+
       return res.json({ success: true, data: Array.from(byDay.entries()).map(([date, counts]) => ({ date, ...counts })).sort((a, b) => a.date.localeCompare(b.date)) });
     }
   } catch (err) {
@@ -246,14 +281,37 @@ async function getVehicleCount(req, res) {
       return { total: unique.size, entry, exit, twoWheeler, fourWheeler, twoWheelerEntry, twoWheelerExit, fourWheelerEntry, fourWheelerExit };
     };
 
-    res.json({
-      success: true,
-      data: {
-        day: process(all.filter(r => r.DataTime >= t.dayStartFloat)),
-        week: process(all.filter(r => r.DataTime >= t.weekStartFloat)),
-        month: process(all)
+    const dayData   = process(all.filter(r => r.DataTime >= t.dayStartFloat));
+    const weekData  = process(all.filter(r => r.DataTime >= t.weekStartFloat));
+    const monthData = process(all);
+
+    // Merge in-memory Temporal events so simulator scans appear in counts immediately
+    const dayStartMs   = floatToMs(t.dayStartFloat);
+    const dayEndMs     = floatToMs(t.nextDayStartFloat);
+    const weekStartMs  = floatToMs(t.weekStartFloat);
+    const monthStartMs = floatToMs(t.monthStartFloat);
+
+    for (const ev of temporalEvents.getAll()) {
+      const ms = ev.timestampMs;
+      const isEntry = ev.type === 'ENTRY';
+      const isExit  = ev.type === 'EXIT';
+      if (!isEntry && !isExit) continue;
+
+      if (ms >= dayStartMs && ms < dayEndMs) {
+        if (isEntry) { dayData.entry++; dayData.total++; }
+        else           dayData.exit++;
       }
-    });
+      if (ms >= weekStartMs) {
+        if (isEntry) { weekData.entry++; weekData.total++; }
+        else           weekData.exit++;
+      }
+      if (ms >= monthStartMs) {
+        if (isEntry) { monthData.entry++; monthData.total++; }
+        else           monthData.exit++;
+      }
+    }
+
+    res.json({ success: true, data: { day: dayData, week: weekData, month: monthData } });
   } catch (err) {
     console.error('getVehicleCount error:', err.message);
     res.status(500).json({ success: false, error: err.message });
@@ -279,7 +337,7 @@ async function getEventCounts(req, res) {
         SET NOCOUNT ON;
         SELECT COUNT(*) AS cnt FROM OutputRecord WITH (NOLOCK)
         WHERE DataTime >= @dayStartFloat AND DataTime < @nextDayStartFloat
-      `, { dayStartFloat, nextDayStartFloat });
+      `, { dayStartFloat, nextDayStartFloat }, { silent: true });
       lightCount = lightResult.recordset[0].cnt;
     } catch {
       lightCount = null; // Table not configured yet
