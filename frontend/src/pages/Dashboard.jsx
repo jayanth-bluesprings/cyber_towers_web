@@ -5,7 +5,7 @@ import VehicleChart from '../components/VehicleChart.jsx';
 import LiveTable from '../components/LiveTable.jsx';
 import { fetchTrigger24hAlert, fetchVehicleCount, fetchHealthEvents } from '../api/index.js';
 
-export default function Dashboard({ dark, setDark, onNavigate, onLogout, activePage = 'dashboard' }) {
+export default function Dashboard({ dark, setDark, onNavigate, onLogout, activePage = 'dashboard', role = 'security' }) {
   const [wsStatus, setWsStatus] = useState('connecting');
   const [period, setPeriod] = useState('day');
   const [isAlerting, setIsAlerting] = useState(false);
@@ -94,6 +94,7 @@ export default function Dashboard({ dark, setDark, onNavigate, onLogout, activeP
         activePage={activePage}
         onNavigate={onNavigate}
         onLogout={onLogout}
+        role={role}
       />
 
       <main className="flex-1 max-w-screen-2xl mx-auto w-full px-4 py-5 flex flex-col gap-5">

@@ -90,7 +90,7 @@ function saveCompanies(list) {
   }
 }
 
-export default function ConfigPage({ dark, setDark, onNavigate, onLogout, activePage = 'config' }) {
+export default function ConfigPage({ dark, setDark, onNavigate, onLogout, activePage = 'config', role = 'admin' }) {
   const [registryState, setRegistryState] = useState(() => loadRegisteredVehiclesState());
   const [parkingAllocations, setParkingAllocations] = useState(() => loadParkingAllocations());
   const [companies, setCompanies] = useState(() => loadCompanies());
@@ -408,7 +408,7 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col">
-      <Navbar dark={dark} setDark={setDark} activePage={activePage} onNavigate={onNavigate} onLogout={onLogout} />
+      <Navbar dark={dark} setDark={setDark} activePage={activePage} onNavigate={onNavigate} onLogout={onLogout} role={role} />
 
       <main className="flex-1 max-w-screen-2xl mx-auto w-full px-4 py-5 flex flex-col gap-6">
         <div>

@@ -1,6 +1,19 @@
 import { useEffect, useState } from 'react';
 
-const NAV_ITEMS = [
+// Pages each role can see in the nav
+const ROLE_NAV = {
+  security:   ['dashboard', 'live'],
+  supervisor: ['dashboard', 'live', 'report'],
+  admin:      ['dashboard', 'live', 'report', 'config'],
+};
+
+const ROLE_LABELS = {
+  security:   { label: 'Security Guard', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
+  supervisor: { label: 'Supervisor',     color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' },
+  admin:      { label: 'Administrator',  color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300' },
+};
+
+const ALL_NAV_ITEMS = [
   {
     key: 'dashboard',
     label: 'Dashboard',
@@ -42,9 +55,13 @@ const NAV_ITEMS = [
   },
 ];
 
-export default function Navbar({ dark, setDark, wsStatus, activePage, onNavigate, onLogout }) {
+export default function Navbar({ dark, setDark, wsStatus, activePage, onNavigate, onLogout, role = 'security' }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
+
+  const allowedKeys = ROLE_NAV[role] || ROLE_NAV.security;
+  const NAV_ITEMS = ALL_NAV_ITEMS.filter((item) => allowedKeys.includes(item.key));
+  const roleInfo = ROLE_LABELS[role] || ROLE_LABELS.security;
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -123,6 +140,11 @@ export default function Navbar({ dark, setDark, wsStatus, activePage, onNavigate
               </svg>
             )}
           </button>
+
+          {/* Role badge */}
+          <span className={`hidden md:inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold ${roleInfo.color}`}>
+            {roleInfo.label}
+          </span>
 
           {onLogout && (
             <button

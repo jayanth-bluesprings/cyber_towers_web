@@ -7,8 +7,25 @@ import ConfigPage from './pages/ConfigPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 
 const AUTH_STORAGE_KEY = 'vehicleAccessAuth';
-const HARDCODED_USERNAME = 'admin';
-const HARDCODED_PASSWORD = 'admin123';
+const AUTH_ROLE_KEY   = 'vehicleAccessRole';
+
+// Role definitions — username → { password, role, displayName }
+const USERS = {
+  security:   { password: 'Guard@2024',  role: 'security',   displayName: 'Security Guard' },
+  supervisor: { password: 'Super@2024',  role: 'supervisor', displayName: 'Supervisor' },
+  admin:      { password: 'Admin@2024',  role: 'admin',      displayName: 'Administrator' },
+};
+
+// Which pages each role can access
+const ROLE_ACCESS = {
+  security:   ['dashboard', 'live'],
+  supervisor: ['dashboard', 'live', 'report'],
+  admin:      ['dashboard', 'live', 'report', 'config'],
+};
+
+export function canAccess(role, page) {
+  return (ROLE_ACCESS[role] || []).includes(page);
+}
 
 export default function App() {
   const navigate = useNavigate();
@@ -20,6 +37,7 @@ export default function App() {
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem(AUTH_STORAGE_KEY) === 'true');
+  const [role, setRole] = useState(() => sessionStorage.getItem(AUTH_ROLE_KEY) || 'security');
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -46,18 +64,22 @@ export default function App() {
       : 'dashboard';
 
   function handleLogin(username, password) {
-    const ok = username === HARDCODED_USERNAME && password === HARDCODED_PASSWORD;
-    if (!ok) return false;
+    const user = USERS[username.trim().toLowerCase()];
+    if (!user || user.password !== password) return false;
 
     sessionStorage.setItem(AUTH_STORAGE_KEY, 'true');
+    sessionStorage.setItem(AUTH_ROLE_KEY, user.role);
     setIsAuthenticated(true);
+    setRole(user.role);
     navigate('/');
     return true;
   }
 
   function handleLogout() {
     sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    sessionStorage.removeItem(AUTH_ROLE_KEY);
     setIsAuthenticated(false);
+    setRole('security');
     navigate('/login');
   }
 
@@ -69,57 +91,21 @@ export default function App() {
     return <Navigate to="/" replace />;
   }
 
+  const sharedProps = { dark, setDark, onNavigate: navigateByPage, onLogout: handleLogout, activePage, role };
+
   return (
     <Routes>
       <Route path="/login" element={<LoginPage dark={dark} setDark={setDark} onLogin={handleLogin} />} />
-      <Route
-        path="/"
-        element={
-          <Dashboard
-            dark={dark}
-            setDark={setDark}
-            onNavigate={navigateByPage}
-            onLogout={handleLogout}
-            activePage={activePage}
-          />
-        }
-      />
+      <Route path="/" element={<Dashboard {...sharedProps} />} />
       <Route
         path="/report"
-        element={
-          <ReportPage
-            dark={dark}
-            setDark={setDark}
-            onNavigate={navigateByPage}
-            onLogout={handleLogout}
-            activePage={activePage}
-          />
-        }
+        element={canAccess(role, 'report') ? <ReportPage {...sharedProps} /> : <Navigate to="/" replace />}
       />
       <Route path="/authorized" element={<Navigate to="/config" replace />} />
-      <Route
-        path="/live"
-        element={
-          <LiveEntryExitPage
-            dark={dark}
-            setDark={setDark}
-            onNavigate={navigateByPage}
-            onLogout={handleLogout}
-            activePage={activePage}
-          />
-        }
-      />
+      <Route path="/live" element={<LiveEntryExitPage {...sharedProps} />} />
       <Route
         path="/config"
-        element={
-          <ConfigPage
-            dark={dark}
-            setDark={setDark}
-            onNavigate={navigateByPage}
-            onLogout={handleLogout}
-            activePage={activePage}
-          />
-        }
+        element={canAccess(role, 'config') ? <ConfigPage {...sharedProps} /> : <Navigate to="/" replace />}
       />
       <Route path="*" element={<Navigate to={isAuthenticated ? '/' : '/login'} replace />} />
     </Routes>

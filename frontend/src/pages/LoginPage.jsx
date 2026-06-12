@@ -95,8 +95,7 @@ export default function LoginPage({ dark, setDark, onLogin }) {
           </button>
 
           <div className="rounded-xl bg-slate-50 dark:bg-slate-800/70 px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
-            Hardcoded login:
-            <span className="ml-1 font-mono text-slate-700 dark:text-slate-200">admin / admin123</span>
+            Contact your administrator for login credentials.
           </div>
         </form>
       </div>

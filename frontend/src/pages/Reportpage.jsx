@@ -277,7 +277,7 @@ function Pagination({ page, totalPages, onChange }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function ReportPage({ dark, setDark, onNavigate, onLogout, activePage = 'report' }) {
+export default function ReportPage({ dark, setDark, onNavigate, onLogout, activePage = 'report', role = 'supervisor' }) {
   const [filters,        setFilters]        = useState(() => ({ ...DEFAULT_FILTERS, ...defaultDateRange() }));
   const [page,           setPage]           = useState(1);
   const [quickRange,     setQuickRange]     = useState('');
@@ -325,7 +325,7 @@ export default function ReportPage({ dark, setDark, onNavigate, onLogout, active
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <Navbar dark={dark} setDark={setDark} activePage={activePage} onNavigate={onNavigate} onLogout={onLogout} />
+      <Navbar dark={dark} setDark={setDark} activePage={activePage} onNavigate={onNavigate} onLogout={onLogout} role={role} />
 
       <div className="mx-auto max-w-screen-2xl space-y-5 p-4 sm:p-6">
 

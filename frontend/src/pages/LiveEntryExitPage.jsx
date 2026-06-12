@@ -189,7 +189,7 @@ function VehicleBadge({ type }) {
 }
 
 /* ─── main page ─────────────────────────────────────────── */
-export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout, activePage = 'live' }) {
+export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout, activePage = 'live', role = 'security' }) {
   const [records, setRecords] = useState(() => loadStoredEntryExitRecords());
   const [localApprovals, setLocalApprovals] = useState(() => loadLocalAccessApprovals());
   const [parkingAllocations, setParkingAllocations] = useState(() => loadParkingAllocations());
@@ -436,6 +436,7 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
         activePage={activePage}
         onNavigate={onNavigate}
         onLogout={onLogout}
+        role={role}
       />
 
       <main className="flex-1 max-w-screen-2xl mx-auto w-full px-4 py-5 flex flex-col gap-5">
@@ -750,8 +751,8 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
                         </td>
 
                         <td className="px-3 py-3">
-                          {!auth.isAuthorized && gate.dir === 'entry' && !isLocallyAllowed ? (
-                            /* Unauthorized entry — not yet approved: show Allow button */
+                          {!auth.isAuthorized && gate.dir === 'entry' && !isLocallyAllowed && (role === 'security' || role === 'admin') ? (
+                            /* Unauthorized entry — only security/admin can allow */
                             <button
                               type="button"
                               onClick={() => openAllowModal(record)}
