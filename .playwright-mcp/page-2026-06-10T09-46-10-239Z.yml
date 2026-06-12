@@ -1,0 +1,97 @@
+- generic [ref=e20569]:
+  - navigation [ref=e20570]:
+    - generic [ref=e20571]:
+      - generic [ref=e20572]:
+        - img "Logo" [ref=e20574]
+        - generic [ref=e20575]:
+          - heading "Vehicle Access Management" [level=1] [ref=e20576]
+          - paragraph [ref=e20577]: Security Dashboard
+      - generic [ref=e20578]:
+        - button "Dashboard" [ref=e20579] [cursor=pointer]:
+          - img [ref=e20580]
+          - text: Dashboard
+        - button "Live Entry/Exit" [ref=e20582] [cursor=pointer]:
+          - img [ref=e20583]
+          - text: Live Entry/Exit
+        - button "Reports" [ref=e20585] [cursor=pointer]:
+          - img [ref=e20586]
+          - text: Reports
+        - button "Configuration" [ref=e20588] [cursor=pointer]:
+          - img [ref=e20589]
+          - text: Configuration
+      - generic [ref=e20591]:
+        - generic [ref=e20593]:
+          - generic [ref=e20594]: CyberTowers, Hyderabad
+          - generic [ref=e20595]: Wed, 10 Jun · 03:16:10 pm IST
+        - button "Toggle dark mode" [ref=e20596] [cursor=pointer]:
+          - img [ref=e20597]
+        - button "Logout" [ref=e20599] [cursor=pointer]:
+          - img [ref=e20600]
+          - text: Logout
+  - generic [ref=e20602]:
+    - generic [ref=e20603]:
+      - generic [ref=e20604]:
+        - heading "Vehicle Report" [level=1] [ref=e20605]
+        - paragraph [ref=e20606]: Vehicle sessions with export-ready details
+      - generic [ref=e20607]:
+        - button "Download CSV" [ref=e20608] [cursor=pointer]:
+          - img [ref=e20609]
+          - text: Download CSV
+        - button "Download PDF" [ref=e20611] [cursor=pointer]:
+          - img [ref=e20612]
+          - text: Download PDF
+    - generic [ref=e20614]:
+      - paragraph [ref=e20615]: Filter Report
+      - generic [ref=e20616]:
+        - button "Today" [ref=e20617] [cursor=pointer]
+        - button "Week" [ref=e20618] [cursor=pointer]
+        - button "Month" [ref=e20619] [cursor=pointer]
+      - generic [ref=e20620]:
+        - generic [ref=e20621]:
+          - generic [ref=e20622]: From
+          - textbox [ref=e20623]: 2026-05-12
+        - generic [ref=e20624]:
+          - generic [ref=e20625]: To
+          - textbox [ref=e20626]: 2026-06-10
+        - generic [ref=e20627]:
+          - generic [ref=e20628]: Type
+          - combobox [ref=e20629]:
+            - option "All Types" [selected]
+            - option "2-Wheeler"
+            - option "4-Wheeler"
+        - generic [ref=e20630]:
+          - generic [ref=e20631]: Status
+          - combobox [ref=e20632]:
+            - option "All Status" [selected]
+            - option "Still Inside"
+            - option "Exited"
+        - generic [ref=e20633]:
+          - generic [ref=e20634]: Authorization
+          - combobox [ref=e20635]:
+            - option "All Types" [selected]
+            - option "Authorized"
+            - option "Unauthorized"
+        - generic [ref=e20636]:
+          - generic [ref=e20637]: Search
+          - textbox "Card, Vehicle No., Company" [ref=e20638]
+      - button "Reset" [ref=e20640] [cursor=pointer]
+    - generic [ref=e20641]:
+      - generic [ref=e20642]:
+        - paragraph [ref=e20643]: 0 sessions
+        - paragraph [ref=e20645]: Page 1 of 1
+      - table [ref=e20647]:
+        - rowgroup [ref=e20648]:
+          - row "Card ID Vehicle No. Company Name Authorization Vehicle Type Entry Time Exit Time Duration Status Action" [ref=e20649]:
+            - columnheader "Card ID" [ref=e20650]
+            - columnheader "Vehicle No." [ref=e20651]
+            - columnheader "Company Name" [ref=e20652]
+            - columnheader "Authorization" [ref=e20653]
+            - columnheader "Vehicle Type" [ref=e20654]
+            - columnheader "Entry Time" [ref=e20655]
+            - columnheader "Exit Time" [ref=e20656]
+            - columnheader "Duration" [ref=e20657]
+            - columnheader "Status" [ref=e20658]
+            - columnheader "Action" [ref=e20659]
+        - rowgroup [ref=e20660]:
+          - row "No sessions found for the selected filters." [ref=e20661]:
+            - cell "No sessions found for the selected filters." [ref=e20662]

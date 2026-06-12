@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Excalidraw Generator v3 — Cyber Towers Temporal Workflows</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Segoe UI',sans-serif; background:#0a0f1e; color:white;
+       min-height:100vh; display:flex; flex-direction:column; align-items:center;
+       justify-content:center; gap:18px; padding:30px; }
+h1  { font-size:20pt; font-weight:900; text-align:center; }
+.sub { color:#94a3b8; font-size:11pt; text-align:center; }
+#status { color:#4ade80; font-weight:700; font-size:11pt; min-height:22px; }
+.btn { background:#2563eb; color:white; border:none; padding:14px 40px;
+       border-radius:8px; font-size:13pt; font-weight:700; cursor:pointer; }
+.btn:hover { background:#1d4ed8; }
+.guide { background:#1e293b; border:1px solid #334155; border-radius:10px;
+         padding:18px 24px; max-width:500px; font-size:10.5pt; line-height:1.9;
+         color:#cbd5e1; }
+.guide strong { color:#38bdf8; }
+.leg { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+.lc  { display:flex; align-items:center; gap:6px; font-size:9.5pt; color:#94a3b8; }
+.lb  { width:24px; height:14px; border-radius:3px; flex-shrink:0; }
+</style>
+</head>
+<body>
+<h1>🔀 Temporal Workflow Diagrams</h1>
+<div class="sub">Cyber Towers · Vehicle Access Dashboard · With Real Application Context</div>
+<div id="status"></div>
+<button class="btn" onclick="gen()">⬇ Generate & Download .excalidraw</button>
+
+<div class="guide">
+  <strong>How to open:</strong><br>
+  1. Click button — file downloads automatically<br>
+  2. Go to <strong>excalidraw.com</strong><br>
+  3. Drag &amp; drop the .excalidraw file onto the canvas<br>
+  4. Press <strong>Ctrl+Shift+H</strong> to fit all on screen<br><br>
+  <strong>Colour legend:</strong>
+  <div class="leg">
+    <div class="lc"><div class="lb" style="background:#0f172a"></div>Start/End</div>
+    <div class="lc"><div class="lb" style="background:#0284c7"></div>System Action</div>
+    <div class="lc"><div class="lb" style="background:#d97706"></div>Wait/Timer</div>
+    <div class="lc"><div class="lb" style="background:#7c3aed"></div>Human Signal</div>
+    <div class="lc"><div class="lb" style="background:#dc2626"></div>Alert/Error</div>
+    <div class="lc"><div class="lb" style="background:#059669"></div>Success End</div>
+    <div class="lc"><div class="lb" style="background:#0c4a6e; border:1px dashed #38bdf8"></div>Website UI</div>
+    <div class="lc"><div class="lb" style="background:#1e0030; border:1px dashed #7c3aed"></div>Trigger Source</div>
+  </div>
+</div>
+
+<script>
+// ─── helpers ────────────────────────────────────────────────────────────────
+let _n = 0;
+const uid  = (p='e') => `${p}_${++_n}`;
+const seed = ()      => (_n * 6271 + 13337) & 0x7FFFFFFF;
+const ELS  = [];
+
+const PAL = {
+  start:   { bg:'#0f172a', sk:'#334155', fg:'#f1f5f9' },
+  act:     { bg:'#0284c7', sk:'#0369a1', fg:'#ffffff' },
+  act2:    { bg:'#075985', sk:'#0369a1', fg:'#e0f2fe' },
+  timer:   { bg:'#d97706', sk:'#b45309', fg:'#ffffff' },
+  signal:  { bg:'#7c3aed', sk:'#6d28d9', fg:'#f5f3ff' },
+  alert:   { bg:'#dc2626', sk:'#991b1b', fg:'#ffffff' },
+  endOk:   { bg:'#059669', sk:'#047857', fg:'#ffffff' },
+  endWn:   { bg:'#b45309', sk:'#92400e', fg:'#fef3c7' },
+  endEr:   { bg:'#991b1b', sk:'#7f1d1d', fg:'#fee2e2' },
+  info:    { bg:'#1e3a5f', sk:'#0284c7', fg:'#e0f2fe' },
+  proc:    { bg:'#052e16', sk:'#059669', fg:'#bbf7d0' },
+  dec:     { bg:'#fef3c7', sk:'#d97706', fg:'#78350f' },
+  hdr:     { bg:'#1e3a5f', sk:'#1e3a5f', fg:'#ffffff' },
+  trig:    { bg:'#1e0030', sk:'#7c3aed', fg:'#ddd6fe' },
+  web:     { bg:'#0c4a6e', sk:'#0284c7', fg:'#e0f2fe' },
+  webG:    { bg:'#052e16', sk:'#059669', fg:'#bbf7d0' },
+  webA:    { bg:'#450a0a', sk:'#dc2626', fg:'#fecaca' },
+  webW:    { bg:'#431407', sk:'#d97706', fg:'#fed7aa' },
+};
+
+// ─── element builders ───────────────────────────────────────────────────────
+function bel(id, type, x, y, w, h, extra={}) {
+  return { id, type, x, y, width:w, height:h, angle:0,
+           fillStyle:'solid', strokeWidth:2, strokeStyle:'solid',
+           roughness:0, opacity:100, groupIds:[], frameId:null,
+           roundness:null, seed:seed(), version:1, versionNonce:seed(),
+           isDeleted:false, boundElements:[], updated:1, link:null, locked:false,
+           ...extra };
+}
+
+function box(x, y, w, h, text, ck, pill=false, dash=false) {
+  const id=uid('r'), tid=uid('t'), c=PAL[ck]||PAL.act;
+  ELS.push({ ...bel(id,'rectangle',x,y,w,h),
+    strokeColor:c.sk, backgroundColor:c.bg,
+    strokeStyle:dash?'dashed':'solid', strokeWidth:dash?1.5:2,
+    roundness:pill?{type:3}:{type:3,value:7},
+    boundElements:[{type:'text',id:tid}] });
+  ELS.push({ ...bel(tid,'text',x+5,y+3,w-10,h-6),
+    strokeColor:c.fg, backgroundColor:'transparent', strokeWidth:1,
+    text, fontSize:11, fontFamily:1, textAlign:'center', verticalAlign:'middle',
+    containerId:id, originalText:text, lineHeight:1.32, baseline:11 });
+  return {id,x,y,w,h,cx:x+w/2,cy:y+h/2};
+}
+
+function diam(x, y, w, h, text) {
+  const id=uid('d'), tid=uid('t'), c=PAL.dec;
+  ELS.push({ ...bel(id,'diamond',x,y,w,h),
+    strokeColor:c.sk, backgroundColor:c.bg,
+    boundElements:[{type:'text',id:tid}] });
+  ELS.push({ ...bel(tid,'text',x+w*.16,y+h*.16,w*.68,h*.68),
+    strokeColor:c.fg, backgroundColor:'transparent', strokeWidth:1,
+    text, fontSize:10, fontFamily:1, textAlign:'center', verticalAlign:'middle',
+    containerId:id, originalText:text, lineHeight:1.25, baseline:10 });
+  return {id,x,y,w,h,cx:x+w/2,cy:y+h/2};
+}
+
+function arr(from, to, col='#64748b', dash=false, lbl='') {
+  const id=uid('a');
+  const sx=from.cx, sy=from.y+from.h, ex=to.cx, ey=to.y;
+  const mx=Math.min(sx,ex), my=Math.min(sy,ey);
+  ELS.push({ ...bel(id,'arrow',mx,my,Math.abs(ex-sx)||2,Math.abs(ey-sy)||2),
+    strokeColor:col, backgroundColor:'transparent',
+    strokeStyle:dash?'dashed':'solid', strokeWidth:dash?1.5:2,
+    roughness:0, roundness:{type:2},
+    points:[[sx-mx,sy-my],[ex-mx,ey-my]],
+    lastCommittedPoint:null,
+    startBinding:{elementId:from.id,focus:0,gap:4},
+    endBinding:{elementId:to.id,focus:0,gap:4},
+    startArrowhead:null, endArrowhead:'arrow' });
+  if(lbl) lbl_txt(Math.min(sx,ex)+(Math.abs(ex-sx)>>1)-20, Math.min(sy,ey)+(Math.abs(ey-sy)>>1)-9, 42, lbl, col, 9);
+  return id;
+}
+
+function harr(from, to, col='#38bdf8') {
+  const id=uid('ha');
+  const sx=from.x+from.w, sy=from.cy, ex=to.x, ey=to.cy;
+  const mx=Math.min(sx,ex), my=Math.min(sy,ey);
+  ELS.push({ ...bel(id,'arrow',mx,my,Math.abs(ex-sx)||2,Math.abs(ey-sy)||2),
+    strokeColor:col, backgroundColor:'transparent',
+    strokeStyle:'dashed', strokeWidth:1.5, roughness:0, roundness:{type:2},
+    points:[[sx-mx,sy-my],[ex-mx,ey-my]], lastCommittedPoint:null,
+    startBinding:{elementId:from.id,focus:0,gap:4},
+    endBinding:{elementId:to.id,focus:0,gap:4},
+    startArrowhead:null, endArrowhead:'arrow' });
+}
+
+function lbl_txt(x,y,w,text,col='#94a3b8',fs=10){
+  const id=uid('lb');
+  ELS.push({ ...bel(id,'text',x,y,w,fs+4),
+    strokeColor:col, backgroundColor:'transparent', strokeWidth:1,
+    text, fontSize:fs, fontFamily:1, textAlign:'center', verticalAlign:'top',
+    containerId:null, originalText:text, lineHeight:1.2, baseline:fs });
+}
+
+function hdr_box(x,y,w,text,ck='hdr'){
+  const id=uid('h'), tid=uid('t'), c=PAL[ck]||PAL.hdr;
+  ELS.push({ ...bel(id,'rectangle',x,y,w,54),
+    strokeColor:c.sk, backgroundColor:c.bg,
+    roundness:{type:3,value:10}, boundElements:[{type:'text',id:tid}] });
+  ELS.push({ ...bel(tid,'text',x+8,y+4,w-16,46),
+    strokeColor:c.fg, backgroundColor:'transparent', strokeWidth:1,
+    text, fontSize:12, fontFamily:1, fontStyle:1,
+    textAlign:'center', verticalAlign:'middle',
+    containerId:id, originalText:text, lineHeight:1.3, baseline:12 });
+  return {id,x,y,w,h:54,cx:x+w/2,cy:y+27};
+}
+
+function dash_frame(x,y,w,h,label,col='#334155'){
+  const id=uid('fr'), tid=uid('t');
+  ELS.push({ ...bel(id,'rectangle',x,y,w,h),
+    strokeColor:col, backgroundColor:'transparent',
+    strokeStyle:'dashed', strokeWidth:1.5, roughness:0,
+    roundness:{type:3,value:14}, boundElements:[] });
+  if(label){
+    ELS.push({ ...bel(tid,'text',x+14,y+10,w-28,16),
+      strokeColor:col, backgroundColor:'transparent', strokeWidth:1,
+      text:label, fontSize:11, fontFamily:1, textAlign:'left', verticalAlign:'top',
+      containerId:null, originalText:label, lineHeight:1.2, baseline:11 });
+  }
+  return {id,x,y,w,h};
+}
+
+// ─── layout helpers ──────────────────────────────────────────────────────────
+const FW  = 210;   // flow node width
+const DW  = 172;   // diamond width
+const DH  = 76;    // diamond height
+const NH  = 60;    // default node height
+const AW  = 178;   // annotation (website) width
+const AG  = 18;    // gap: flow → annotation
+const VG  = 18;    // vertical gap between nodes
+const WS  = 490;   // column separation (centre to centre)
+
+const fx = i => i * WS;          // flow left edge for workflow i
+const ax = i => fx(i) + FW + AG; // annotation left edge
+
+// ─── workflow column builder ─────────────────────────────────────────────────
+// node: { ck, text, h, pill, web, wh, wck, al, ac, isDiam, noArr, isEnd }
+function wfcol(wi, title, trigText, nodes) {
+  const bx = fx(wi);
+  let y = 0;
+
+  // header
+  hdr_box(bx, y, FW + AG + AW, title);
+  y += 54 + 8;
+
+  // trigger
+  if (trigText) {
+    box(bx, y, FW + AG + AW, 68, trigText, 'trig', false, true);
+    y += 68 + 12;
+  }
+
+  const els = [];
+
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    const h = n.h || (n.isDiam ? DH : NH);
+
+    // node
+    let el;
+    if (n.isDiam) {
+      el = diam(bx + (FW - DW) / 2, y, DW, DH, n.text);
+    } else {
+      el = box(bx, y, FW, h, n.text, n.ck, n.pill || false);
+    }
+
+    // vertical arrow from previous
+    if (i > 0 && !n.noArr) {
+      const prev = els[els.length - 1];
+      arr(prev, el, n.ac || '#64748b', false, n.al || '');
+    }
+
+    // website annotation
+    if (n.web) {
+      const wh = n.wh || 70;
+      const wc = n.wck || 'web';
+      const wy = el.cy - wh / 2;
+      const wa = box(ax(wi), wy, AW, wh, n.web, wc, false, true);
+      harr(el, wa, PAL[wc]?.sk || '#38bdf8');
+    }
+
+    els.push(el);
+    y += h + VG;
+  }
+  return y;
+}
+
+// ─── GENERATE ───────────────────────────────────────────────────────────────
+function gen() {
+  ELS.length = 0; _n = 0;
+
+  // ═══════════════════════════════════════════════════════
+  // WF1  Vehicle Session Lifecycle
+  // ═══════════════════════════════════════════════════════
+  wfcol(0,
+  '① Vehicle Session Lifecycle\nOne process per vehicle · entry to exit',
+  '⚡ REAL TRIGGER: Physical RFID reader at gate\n→ writes to SQL CardRecord table (PortNum=1)\n→ websocket.js polls DB every 3 sec → new row detected → WF1 starts',
+  [
+    { ck:'start', pill:true,
+      text:'🚗 VEHICLE ENTRY SCAN\nPortNum=1 · Gate 1 or Gate 2',
+      web:'🖥 LIVE ENTRY/EXIT PAGE\n↑ New row · green slide-in\nCard ID · Gate · Time shown',
+      wck:'webG' },
+    { ck:'act',
+      text:'📋 Record Entry to Audit Log\nCard ID · Gate · Time · Vehicle Type' },
+    { ck:'act',
+      text:'🔐 Check: Authorized or Unauthorized?\nIs PCode present in Personnel table?',
+      web:'🖥 AUTHORIZATION BADGE\n• PCode present → ✅ "Authorized"\n• PCode empty → ⚠️ "Unauthorized"',
+      wck:'web' },
+    { isDiam:true,
+      text:'Vehicle\nAuthorized?' },
+    { ck:'act', al:'YES', ac:'#16a34a',
+      text:'▶ Start WF7 (Parking Count Update)\nTracks company slot count X/Total',
+      web:'🖥 PARKING COLUMN\nUpdates to "X/Total" (e.g. 3/10)\nAll dashboard users see it live',
+      wck:'webG' },
+    { ck:'act',
+      text:'⏱ Start WF2 (Overstay Alert)\n24-hour countdown begins NOW' },
+    { ck:'timer', h:70,
+      text:'⏳ WORKFLOW SLEEPS HERE\nWaiting for exit scan\nCould be minutes · hours · days\nSurvives any server restart',
+      web:'🖥 STATS CARDS\n"Still Inside" count increases\nVehicle in Occupancy modal\nDuration shown as running',
+      wck:'web' },
+    { isDiam:true,
+      text:'What\nhappens?' },
+    { ck:'act', al:'Exit scan', ac:'#16a34a',
+      text:'📤 Exit scan received (PortNum=2)\n⛔ Cancel WF2 overstay timer',
+      web:'🖥 LIVE TABLE\n↓ Exit badge appears\n"Still Inside" count decreases',
+      wck:'webG' },
+    { ck:'act',
+      text:'💾 Record Exit · Decrement Slot Count\n⏱ Compute Session Duration' },
+    { ck:'endOk', pill:true,
+      text:'✅ SESSION COMPLETE · Vehicle exited',
+      web:'🖥 REPORTS PAGE\nSession entry/exit/duration\nstored and visible in reports',
+      wck:'webG' },
+  ]);
+
+  // "NO" branch label for unauthorized
+  lbl_txt(fx(0) + FW/2 - 16, fx(0) + FW + 10, 40, 'NO → WF3', '#dc2626', 9);
+  box(fx(0) - 198, 54+8+68+12 + 3*(NH+VG) + (DH+VG) - 12, 190, 56,
+    '▶ Start WF3\nUnauthorized Approval\n(see Workflow 3 →)', 'alert', false, true);
+
+  // ═══════════════════════════════════════════════════════
+  // WF2  Overstay Alert & Escalation
+  // ═══════════════════════════════════════════════════════
+  wfcol(1,
+  '② Overstay Alert & Escalation\nChild of WF1 · per-vehicle 24h timer',
+  '⚡ TRIGGER: Started by WF1 the moment an authorized vehicle enters\nOnly activates if vehicle is STILL INSIDE after 24 hours',
+  [
+    { ck:'start', pill:true,
+      text:'⏱ WF2 STARTS\nCalled by WF1 on every authorized entry' },
+    { ck:'timer', h:76,
+      text:'⏳ WAIT: 24-HOUR DURABLE TIMER\nCounting from entry timestamp\nStored on disk — not in memory\nIf vehicle exits → WF1 cancels this',
+      web:'🖥 NO CHANGE WHILE WAITING\nVehicle shows as "Still Inside"\nOccupancy count stays accurate',
+      wck:'web' },
+    { isDiam:true,
+      text:'Exited before\n24 hours?' },
+    { ck:'endOk', pill:true, al:'YES', ac:'#16a34a',
+      text:'✅ WORKFLOW ENDS\nVehicle exited — no overstay',
+      web:'🖥 NORMAL SESSION\nCloses cleanly · no alert sent',
+      wck:'webG' },
+    { ck:'alert', al:'NO', ac:'#dc2626',
+      text:'📧 SEND 24H WARNING EMAIL\nTo: Admin · Card ID · Company · Entry Time',
+      web:'🖥 STATS CARDS\nOverstay count badge increases\nVehicle flagged in Occupancy modal',
+      wck:'webA' },
+    { ck:'timer',  text:'⏳ WAIT: 12 MORE HOURS' },
+    { isDiam:true, text:'Still inside\nat 36 hours?' },
+    { ck:'alert', al:'YES',
+      text:'📧 36H ESCALATION EMAIL\nTo: Admin · "Vehicle inside 36 hours"' },
+    { ck:'timer',  text:'⏳ WAIT: 12 MORE HOURS' },
+    { isDiam:true, text:'Still inside\nat 48 hours?' },
+    { ck:'alert', al:'YES',
+      text:'🚨 48H CRITICAL ALERT\nTo: Admin + Facility Manager',
+      web:'🖥 OVERSTAY MODAL\nVehicle flagged critical (red)\nDuration shown prominently',
+      wck:'webA' },
+    { ck:'timer',  text:'⏳ WAIT: 24 MORE HOURS' },
+    { ck:'alert',
+      text:'🔴 72H FINAL ALERT\nTo: Admin + Manager + Security Head' },
+    { ck:'endEr', pill:true,
+      text:'🔴 ENDS · Max escalation (72h)' },
+  ]);
+
+  // ═══════════════════════════════════════════════════════
+  // WF3  Unauthorized Vehicle Approval
+  // ═══════════════════════════════════════════════════════
+  wfcol(2,
+  '③ Unauthorized Vehicle Approval\nTriggered when PCode is empty',
+  '⚡ TRIGGER: WF1 detects PCode is empty in Personnel table\n→ Vehicle not registered → WF3 starts immediately',
+  [
+    { ck:'start', pill:true,
+      text:'🚨 UNAUTHORIZED VEHICLE DETECTED\nPCode empty · not in registered list',
+      web:'🖥 LIVE ENTRY/EXIT TABLE\nAmber "Unauthorized" badge\n"Allow" button in Action column',
+      wck:'webA' },
+    { ck:'act',
+      text:'📤 Notify Security Officer\n"Unknown vehicle at Gate X — please decide"',
+      web:'🖥 SECURITY GETS EMAIL\nCard ID · Gate · Time · Action link',
+      wck:'web' },
+    { ck:'act',
+      text:'🖥 Dashboard: "Pending Approval"\nAll devices show PENDING status',
+      web:'🖥 ALL DASHBOARD USERS\n"Pending" badge visible on all tabs\nAction column shows awaiting',
+      wck:'webW' },
+    { ck:'timer', h:68,
+      text:'⏳ WAIT FOR SECURITY DECISION\nTimeout: 30 minutes\nWorkflow sleeps — waiting for human' },
+    { isDiam:true,
+      text:'Response\nwithin 30 min?' },
+    { ck:'signal', al:'APPROVED', ac:'#16a34a',
+      text:'📩 Signal: "approval-granted"\nVehicle No. · Remark · Officer · Timestamp',
+      web:'🖥 BADGE CHANGES\nAmber → Blue "Allowed"\nRemark in Action column\nVisible to ALL users instantly',
+      wck:'webG' },
+    { ck:'act',
+      text:'💾 Save Approval on Server\n📡 Broadcast to all open dashboards' },
+    { ck:'endOk', pill:true,
+      text:'✅ APPROVED · Audit trail saved' },
+    { ck:'alert', al:'NO RESP', ac:'#d97706', noArr:false,
+      text:'📧 Reminder → Security Officer\nEscalate → Facility Manager (60 min)\nFinal → Senior Mgmt (2 hours)',
+      web:'🖥 BADGE\n"Pending — No Response"\nManager alerted via email',
+      wck:'webW' },
+    { ck:'endEr', pill:true,
+      text:'🔴 TIMED OUT (2h) · Unresolved' },
+  ]);
+
+  // ═══════════════════════════════════════════════════════
+  // WF4  Daily Summary Report
+  // ═══════════════════════════════════════════════════════
+  wfcol(3,
+  '④ Daily Summary Report\nScheduled · 11:59 PM every night',
+  '⚡ TRIGGER: Temporal Schedule fires at 11:59 PM\nIf server was down → runs immediately on restart (catch-up)',
+  [
+    { ck:'start', pill:true,
+      text:'🕒 SCHEDULE: 11:59 PM DAILY\nCatch-up on restart if server was down' },
+    { ck:'act',
+      text:'📊 Fetch Entry & Exit Stats\nTotal entries · exits · unique vehicles' },
+    { ck:'act',
+      text:'🏢 Fetch Currently Inside Count\nVehicles inside + overstay count' },
+    { ck:'act',
+      text:'🚫 Fetch Unauthorized Count (NEW)\nHow many unknown vehicles today' },
+    { ck:'act',
+      text:'🏍 Fetch Vehicle Type Breakdown\n2-Wheeler entries · 4-Wheeler entries' },
+    { ck:'act',
+      text:'✍️ Generate HTML Email\nAll stats formatted for management' },
+    { ck:'act',
+      text:'📧 Send Email\nTo: Admin + Facility Manager',
+      web:'🖥 ADMIN INBOX\nFormatted email every night\nAll day stats in one clean view',
+      wck:'webG' },
+    { isDiam:true, text:'Email sent\nsuccessfully?' },
+    { ck:'act', al:'YES', ac:'#16a34a',
+      text:'📁 Archive Report Data\nPermanent storage for audit trail' },
+    { ck:'endOk', pill:true,
+      text:'✅ DAILY REPORT COMPLETE' },
+    { ck:'alert', al:'FAILED', ac:'#dc2626',
+      text:'🔄 RETRY: 5 attempts with backoff\n1m → 2m → 4m → 8m → 16m',
+      web:'🖥 IF ALL FAIL\nFailure email to admin\nReport saved to disk',
+      wck:'webA' },
+    { ck:'endEr', pill:true,
+      text:'🔴 FAILED · Saved for manual send' },
+  ]);
+
+  // ═══════════════════════════════════════════════════════
+  // WF5  Weekly Analytics Report
+  // ═══════════════════════════════════════════════════════
+  wfcol(4,
+  '⑤ Weekly Analytics Report\nEvery Friday 11:00 PM',
+  '⚡ TRIGGER: Temporal Schedule · every Friday 11:00 PM\nNew capability — does not exist in current system',
+  [
+    { ck:'start', pill:true,
+      text:'📅 SCHEDULE: EVERY FRIDAY 11:00 PM\nCovers Mon–Fri of current week' },
+    { ck:'act', text:'📊 Fetch Daily Traffic (Mon–Fri)\nEntry/exit counts per day' },
+    { ck:'act', text:'⏰ Fetch Peak Hours Analysis\nTop 3 busiest time slots' },
+    { ck:'act', text:'🕐 Fetch Overstay Incidents\nAll vehicles >24h + company name' },
+    { ck:'act', text:'🚧 Fetch Gate Utilization\nGate 1 vs Gate 2 % split' },
+    { ck:'act', text:'🚫 Fetch Unauthorized Summary\nEntries · approvals · denials' },
+    { ck:'act', text:'📈 Fetch Week-over-Week Trend\nCompare totals to previous week' },
+    { ck:'act', text:'✍️ Generate Full Weekly Report\nRich HTML with all 6 sections' },
+    { ck:'act',
+      text:'📧 Send: Admin + Manager + Senior Mgmt\nRetry 5x with backoff if fails',
+      web:'🖥 MANAGEMENT INBOXES\nRich weekly email every Friday\nPeak hours · Trends · Overstay',
+      wck:'webG' },
+    { ck:'act',
+      text:'📁 Archive Weekly Stats\nStored for next week comparison' },
+    { ck:'endOk', pill:true, text:'✅ WEEKLY REPORT COMPLETE' },
+  ]);
+
+  // ═══════════════════════════════════════════════════════
+  // WF6  Gate Health Monitor
+  // ═══════════════════════════════════════════════════════
+  wfcol(5,
+  '⑥ Gate Health Monitor\nSingleton · runs forever · 24/7',
+  '⚡ TRIGGER: Starts ONCE when backend server boots\nGate 1 device: 14070001  ·  Gate 2 device: 24074151',
+  [
+    { ck:'start', pill:true,
+      text:'🔌 SERVER BOOTS\nGate monitor starts — singleton' },
+    { ck:'timer', h:74,
+      text:'🔁 INFINITE MONITORING LOOP\n⏳ Wait 5 min (8AM–8PM business hours)\n    Wait 30 min (after hours)' },
+    { isDiam:true, text:'Business\nhours?' },
+    { ck:'info', al:'NO',
+      text:'⏭ Skip full check · Loop back',
+      web:'🖥 HEALTH CHECK MODAL\nGates show last-known status',
+      wck:'web' },
+    { ck:'act', al:'YES', ac:'#16a34a',
+      text:'🔍 Query Gate 1 + Gate 2\nScan count in last 30 min each' },
+    { isDiam:true, text:'Any gate\nsilent 30+ min?' },
+    { ck:'proc', al:'NO — Both OK',
+      text:'✅ Gates healthy · Update state\nLoop back to wait',
+      web:'🖥 HEALTH CHECK MODAL\n✅ Gate 1: Online\n✅ Gate 2: Online',
+      wck:'webG' },
+    { ck:'alert', al:'YES', ac:'#dc2626',
+      text:'📧 GATE OFFLINE ALERT\nTo: Facility Manager within 5 minutes',
+      web:'🖥 HEALTH CHECK MODAL\n🔴 Gate X: OFFLINE\n"Facility manager alerted"',
+      wck:'webA' },
+    { ck:'act',
+      text:'📝 Update Durable State\nGate X offline since [timestamp]' },
+    { isDiam:true, text:'BOTH gates\noffline?' },
+    { ck:'alert', al:'YES', h:74,
+      text:'🔴 CRITICAL ALERT\nBoth gates offline!\nAdmin + Manager + Security Mgmt\nPossible network/power issue',
+      web:'🖥 HEALTH CHECK MODAL\n🔴🔴 CRITICAL · Both offline\nFull management team alerted',
+      wck:'webA' },
+  ]);
+
+  // ═══════════════════════════════════════════════════════
+  // WF7  Parking Slot Management  ← CORRECTED LOGIC
+  // ═══════════════════════════════════════════════════════
+  wfcol(6,
+  '⑦ Parking Slot Count Management\nAuto-count · no pre-assignment',
+  '⚡ TRIGGER: WF1 starts this for every AUTHORIZED vehicle entry\n─────────────────────────────────────────────────────────────────\nHOW IT WORKS: Company has X total parking slots (set in Config page)\nNo slots are pre-assigned to individual vehicles\nWhen a company vehicle enters → count goes up (e.g. 1/10 → 2/10)\nWhen it exits → count goes down (2/10 → 1/10)\nIf count reaches total → company parking is FULL → alerts sent',
+  [
+    { ck:'start', pill:true,
+      text:'🚗 AUTHORIZED VEHICLE ENTERS\nStarted by WF1 on every authorized entry',
+      web:'🖥 LIVE ENTRY/EXIT TABLE\nNew row visible · Entry badge\nParking column shows "Updating..."',
+      wck:'web' },
+    { ck:'act',
+      text:'🏢 Get Vehicle\'s Company\nRead PCode from Personnel table\n(e.g. PCode = "MSF-101" → Microsoft India)' },
+    { ck:'act',
+      text:'📊 Fetch Company Parking Quota\nTotal slots allocated to this company\n(Set in Dashboard → Config → Company Reg.)',
+      web:'🖥 CONFIG PAGE\nCompany registration shows:\n"Microsoft India — 22 total slots"',
+      wck:'web' },
+    { ck:'act',
+      text:'🔢 Count Vehicles Currently Inside\nQuery active WF1 sessions for this company\nCurrently Occupied = vehicles of this company inside now' },
+    { isDiam:true,
+      text:'Occupied count\n< Total slots?' },
+
+    // ── YES branch (normal case) ──
+    { ck:'act', al:'YES — Space free', ac:'#16a34a',
+      text:'➕ Increment Company Occupied Count\nOccupied = Occupied + 1',
+      web:'🖥 LIVE ENTRY/EXIT TABLE\nParking column updates:\n"3/10" → "4/10"\nAll dashboard users see instantly',
+      wck:'webG' },
+    { ck:'act',
+      text:'📡 Broadcast Updated Count\nAll dashboard users get live update\n(WebSocket push to all open tabs)',
+      web:'🖥 LIVE TABLE — PARKING COLUMN\nShows count format: Occupied/Total\nExample: Microsoft 4/22\nOrange when >80%, Red when full',
+      wck:'webG' },
+    { isDiam:true,
+      text:'Count ≥ 80%\nof total?' },
+    { ck:'alert', al:'YES ≥80%', ac:'#d97706', h:68,
+      text:'📧 LOW QUOTA WARNING\nTo: Company Admin + System Admin\n"[Company] at 80%+ · Only [N] slots left"',
+      web:'🖥 LIVE TABLE BADGE\n⚠️ "Microsoft India — Nearly Full"\nYellow badge next to company name',
+      wck:'webW' },
+    { ck:'endOk', pill:true,
+      text:'✅ COUNT UPDATED SUCCESSFULLY\nX/Total visible on dashboard\nVehicle allowed to park',
+      web:'🖥 FINAL STATE\nParking column: e.g. "4/22"\nColor: Green <60%  Orange 60-80%  Red >80%',
+      wck:'webG' },
+
+    // ── NO branch (quota full) ──
+    { ck:'alert', al:'NO — FULL', ac:'#dc2626', h:68,
+      text:'🔴 QUOTA FULL · Cannot accept more\nOccupied = Total (e.g. 10/10)\nThis company has NO free slots',
+      web:'🖥 LIVE TABLE BADGE\n🔴 "Microsoft India — Parking Full 10/10"\nRed badge · All dashboard users see it',
+      wck:'webA' },
+    { ck:'alert', h:74,
+      text:'📧 EMAIL 1 → Company Admin\nSubject: "Parking Quota Full — [Company]"\n· All [N] slots occupied\n· Please request more slots from building mgmt' },
+    { ck:'alert', h:74,
+      text:'📧 EMAIL 2 → System Admin (Dashboard)\nSubject: "Parking Full Alert — [Company]"\n· Quota: [N]/[N] (100% full)\n· Vehicle [Card ID] at [timestamp]' },
+    { ck:'act',
+      text:'📋 Record in Audit Log\nCard ID · Company · Time · Reason: "Quota Full"',
+      web:'🖥 REPORTS PAGE\nEvent logged with reason\nFacility manager can review',
+      wck:'web' },
+    { ck:'endEr', pill:true,
+      text:'🔴 QUOTA FULL — LOGGED\nDual email sent · Red badge on dashboard' },
+  ]);
+
+  // ═══════════════════════════════════════════════════════
+  // WF8  Vehicle Registry Sync
+  // ═══════════════════════════════════════════════════════
+  wfcol(7,
+  '⑧ Vehicle Registry Sync\nBackground · every 55 seconds',
+  '⚡ TRIGGER: Temporal Schedule · every 55 seconds\nDecouples DB lookup from live scan path\nLive scans use cached data — never wait for DB',
+  [
+    { ck:'start', pill:true,
+      text:'⏰ SCHEDULE: EVERY 55 SECONDS\nBackground — does NOT block live scans' },
+    { ck:'act', h:70,
+      text:'📡 Fetch Vehicle Registry from DB\nPersonnel + PersonnelExtend2 tables\nRetry: 3 attempts · Timeout: 30s each' },
+    { isDiam:true, text:'DB query\nsuccessful?' },
+    { ck:'act', al:'YES', ac:'#16a34a',
+      text:'✅ Validate Fetched Data\nCount: total · 2-Wheelers · 4-Wheelers' },
+    { ck:'act',
+      text:'💾 Update In-Memory Cache\nAll live scans read from this instantly' },
+    { ck:'act',
+      text:'🗄 Write to Backup Store\nRedis/SQLite — for crash recovery' },
+    { ck:'act',
+      text:'📝 Log Sync Result\nTimestamp · record counts · duration',
+      web:'🖥 HEALTH CHECK MODAL\n"Cache: 1,245 records"\n"Last synced: 43 seconds ago"\n"2W: 612  4W: 510"',
+      wck:'webG' },
+    { ck:'endOk', pill:true,
+      text:'✅ SYNC COMPLETE · Cache fresh' },
+    { ck:'alert', al:'DB FAILED', ac:'#dc2626',
+      text:'⚠️ Keep Stale Cache\nUse last successful sync data' },
+    { ck:'alert',
+      text:'📧 DB Offline Alert\nTo: System Admin (if down >5 min)',
+      web:'🖥 HEALTH CHECK MODAL\n⚠️ "DB may be offline"\n"Cache last synced [X] min ago"',
+      wck:'webA' },
+    { ck:'endEr', pill:true,
+      text:'🔴 DB OFFLINE ALERT SENT' },
+  ]);
+
+  // ─── Outer application frame ───────────────────────────────────────────────
+  const totalW = 8 * WS + AW + AG + 30;
+  dash_frame(-22, -28, totalW, 1980,
+    'Application Workflow — Cyber Towers Vehicle Access Dashboard', '#0284c7');
+
+  // ─── Parking count example legend ────────────────────────────────────────
+  const lx = fx(6) - 220, ly = -28 + 12;
+  box(lx, ly, 210, 120,
+    '📌 PARKING COUNT EXAMPLE\n─────────────────────\nCompany has 10 total slots\n3 vehicles inside → shows 3/10\n8 vehicles inside → shows 8/10 ⚠\n10 vehicles inside → shows 10/10 🔴\nVehicle exits → 10/10 → 9/10 ✅',
+    'info', false, true);
+
+  // ─── Assemble & download ──────────────────────────────────────────────────
+  const out = {
+    type:'excalidraw', version:2, source:'https://excalidraw.com',
+    elements: ELS,
+    appState: {
+      gridSize:null,
+      viewBackgroundColor:'#f1f5f9',
+      zoom:{ value:0.5 },
+      scrollX:60, scrollY:60,
+    },
+    files:{},
+  };
+
+  const blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Temporal_Workflows_v3_CyberTowers.excalidraw';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+
+  document.getElementById('status').textContent =
+    `✅ Downloaded!  ${ELS.length} elements · 8 workflows · website context included`;
+}
+
+window.addEventListener('load', () => setTimeout(gen, 350));
+</script>
+</body>
+</html>

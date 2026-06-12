@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Excalidraw Generator — Temporal Workflows</title>
+<style>
+  body { font-family: Segoe UI, sans-serif; background: #0f172a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; gap: 20px; }
+  h1 { font-size: 22pt; font-weight: 900; }
+  .sub { color: #94a3b8; font-size: 11pt; }
+  .btn { background: #3b82f6; color: white; border: none; padding: 16px 40px; border-radius: 10px; font-size: 14pt; font-weight: 700; cursor: pointer; }
+  .btn:hover { background: #2563eb; }
+  .info { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 20px 28px; max-width: 500px; font-size: 10.5pt; line-height: 1.8; color: #cbd5e1; }
+  .info strong { color: #38bdf8; }
+  .step { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+  .step-num { background: #3b82f6; color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9pt; font-weight: 800; flex-shrink: 0; }
+  #status { color: #4ade80; font-size: 11pt; font-weight: 700; min-height: 20px; }
+</style>
+</head>
+<body>
+
+<h1>Temporal Workflow Diagrams</h1>
+<div class="sub">Excalidraw Generator — Cyber Towers · Bluesprings AI</div>
+
+<div id="status"></div>
+
+<button class="btn" onclick="generate()">⬇ Generate & Download .excalidraw</button>
+
+<div class="info">
+  <strong>How to open in Excalidraw:</strong>
+  <div class="step"><div class="step-num">1</div> Click the button above to download the .excalidraw file</div>
+  <div class="step"><div class="step-num">2</div> Go to <strong>excalidraw.com</strong></div>
+  <div class="step"><div class="step-num">3</div> Click the menu (☰) → <strong>Open</strong> → select the downloaded file</div>
+  <div class="step"><div class="step-num">4</div> Or simply <strong>drag & drop</strong> the file onto the Excalidraw canvas</div>
+  <div class="step"><div class="step-num">5</div> Press <strong>Ctrl+Shift+H</strong> to fit all 8 workflows on screen</div>
+</div>
+
+<script>
+// ─── ID & seed generators ──────────────────────────────────────────────────────
+let _id = 0;
+const uid = (prefix = 'e') => `${prefix}_${++_id}`;
+const rnd = () => Math.floor(Math.random() * 9999999);
+
+// ─── Element registry ──────────────────────────────────────────────────────────
+const ELS = [];
+
+// ─── Colour palette ────────────────────────────────────────────────────────────
+const C = {
+  start:    { bg: '#0f172a', stroke: '#1e293b', fg: '#ffffff' },
+  activity: { bg: '#0284c7', stroke: '#0369a1', fg: '#ffffff' },
+  activity2:{ bg: '#0369a1', stroke: '#075985', fg: '#ffffff' },
+  timer:    { bg: '#d97706', stroke: '#b45309', fg: '#ffffff' },
+  signal:   { bg: '#7c3aed', stroke: '#6d28d9', fg: '#ffffff' },
+  alert:    { bg: '#dc2626', stroke: '#b91c1c', fg: '#ffffff' },
+  info:     { bg: '#e0f2fe', stroke: '#7dd3fc', fg: '#0c4a6e' },
+  process:  { bg: '#f0fdf4', stroke: '#86efac', fg: '#14532d' },
+  endOk:    { bg: '#059669', stroke: '#047857', fg: '#ffffff' },
+  endWarn:  { bg: '#d97706', stroke: '#b45309', fg: '#ffffff' },
+  endErr:   { bg: '#dc2626', stroke: '#b91c1c', fg: '#ffffff' },
+  header:   { bg: '#1e3a5f', stroke: '#1e3a5f', fg: '#ffffff' },
+  decision: { bg: '#fef3c7', stroke: '#f59e0b', fg: '#78350f' },
+};
+
+// ─── Base element builder ──────────────────────────────────────────────────────
+function base(id, type, x, y, w, h, extra = {}) {
+  return {
+    id, type, x, y, width: w, height: h, angle: 0,
+    fillStyle: 'solid', strokeWidth: 2, strokeStyle: 'solid',
+    roughness: 0, opacity: 100, groupIds: [], frameId: null,
+    roundness: null, seed: rnd(), version: 1, versionNonce: rnd(),
+    isDeleted: false, boundElements: [], updated: 1, link: null, locked: false,
+    ...extra
+  };
+}
+
+// ─── Shape builders ────────────────────────────────────────────────────────────
+function rect(x, y, w, h, text, colorKey, pill = false) {
+  const id = uid('r');
+  const tid = uid('t');
+  const col = C[colorKey] || C.activity;
+  ELS.push({
+    ...base(id, 'rectangle', x, y, w, h),
+    strokeColor: col.stroke,
+    backgroundColor: col.bg,
+    roundness: pill ? { type: 3 } : { type: 3, value: 6 },
+    boundElements: [{ type: 'text', id: tid }],
+  });
+  ELS.push({
+    ...base(tid, 'text', x + 6, y + 4, w - 12, h - 8),
+    strokeColor: col.fg,
+    backgroundColor: 'transparent',
+    strokeWidth: 1,
+    text, fontSize: 13, fontFamily: 1,
+    textAlign: 'center', verticalAlign: 'middle',
+    containerId: id, originalText: text, lineHeight: 1.35, baseline: 13,
+  });
+  return { id, x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
+}
+
+function diamond(x, y, w, h, text) {
+  const id = uid('d');
+  const tid = uid('t');
+  const col = C.decision;
+  ELS.push({
+    ...base(id, 'diamond', x, y, w, h),
+    strokeColor: col.stroke,
+    backgroundColor: col.bg,
+    boundElements: [{ type: 'text', id: tid }],
+  });
+  ELS.push({
+    ...base(tid, 'text', x + w * 0.15, y + h * 0.15, w * 0.7, h * 0.7),
+    strokeColor: col.fg,
+    backgroundColor: 'transparent',
+    strokeWidth: 1,
+    text, fontSize: 12, fontFamily: 1,
+    textAlign: 'center', verticalAlign: 'middle',
+    containerId: id, originalText: text, lineHeight: 1.3, baseline: 12,
+  });
+  return { id, x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
+}
+
+function arrow(fromEl, toEl, color = '#64748b', label = '') {
+  const id = uid('a');
+  const sx = fromEl.cx;
+  const sy = fromEl.y + fromEl.h;
+  const ex = toEl.cx;
+  const ey = toEl.y;
+  ELS.push({
+    ...base(id, 'arrow', sx, sy, Math.abs(ex - sx) || 1, Math.abs(ey - sy) || 1),
+    strokeColor: color,
+    backgroundColor: 'transparent',
+    strokeWidth: 2,
+    roughness: 0,
+    roundness: { type: 2 },
+    points: [[0, 0], [ex - sx, ey - sy]],
+    lastCommittedPoint: null,
+    startBinding: { elementId: fromEl.id, focus: 0, gap: 5 },
+    endBinding:   { elementId: toEl.id,   focus: 0, gap: 5 },
+    startArrowhead: null,
+    endArrowhead: 'arrow',
+  });
+  return id;
+}
+
+function label(x, y, w, text, color = '#64748b', fs = 11) {
+  const id = uid('lb');
+  ELS.push({
+    ...base(id, 'text', x, y, w, 20),
+    strokeColor: color,
+    backgroundColor: 'transparent',
+    strokeWidth: 1,
+    text, fontSize: fs, fontFamily: 1,
+    textAlign: 'center', verticalAlign: 'top',
+    containerId: null, originalText: text, lineHeight: 1.2, baseline: fs,
+  });
+  return id;
+}
+
+function sectionLabel(x, y, w, text, colorKey) {
+  const id = uid('sec');
+  const tid = uid('t');
+  const col = C[colorKey] || C.header;
+  ELS.push({
+    ...base(id, 'rectangle', x, y, w, 56),
+    strokeColor: col.stroke,
+    backgroundColor: col.bg,
+    roundness: { type: 3, value: 8 },
+    boundElements: [{ type: 'text', id: tid }],
+  });
+  ELS.push({
+    ...base(tid, 'text', x + 8, y + 4, w - 16, 48),
+    strokeColor: col.fg,
+    backgroundColor: 'transparent',
+    strokeWidth: 1,
+    text, fontSize: 14, fontFamily: 1, fontStyle: 1,
+    textAlign: 'center', verticalAlign: 'middle',
+    containerId: id, originalText: text, lineHeight: 1.3, baseline: 14,
+  });
+  return { id, x, y, w, h: 56, cx: x + w / 2, cy: y + 28 };
+}
+
+// ─── Layout constants ──────────────────────────────────────────────────────────
+const WF_W   = 340;   // workflow column width
+const WF_GAP = 120;   // horizontal gap between workflows
+const NW     = 280;   // node width
+const NH     = 62;    // node height
+const DW     = 220;   // diamond width
+const DH     = 80;    // diamond height
+const GAP    = 28;    // vertical gap between nodes
+
+// ─── Workflow layout helper ────────────────────────────────────────────────────
+function wfCol(wfIndex) { return wfIndex * (WF_W + WF_GAP); }
+
+function buildWF(wfIndex, title, nodes) {
+  const bx = wfCol(wfIndex);
+  let y = 0;
+
+  // Section header
+  const hdr = sectionLabel(bx, y, WF_W, title, 'header');
+  y += 56 + GAP;
+
+  const shapes = [];
+
+  nodes.forEach((n, i) => {
+    const cx = bx + (WF_W - (n.isDiamond ? DW : NW)) / 2;
+    const h  = n.h || (n.isDiamond ? DH : NH);
+    let el;
+
+    if (n.isDiamond) {
+      el = diamond(cx, y, DW, h, n.text);
+    } else {
+      el = rect(cx, y, NW, h, n.text, n.color, n.pill || false);
+    }
+
+    shapes.push(el);
+    y += h + GAP;
+  });
+
+  // Draw arrows between sequential nodes
+  for (let i = 0; i < shapes.length - 1; i++) {
+    const lbl = nodes[i + 1].arrowLabel || '';
+    arrow(shapes[i], shapes[i + 1], nodes[i + 1].arrowColor || '#64748b');
+    if (lbl) label(shapes[i].cx - 60, shapes[i].y + shapes[i].h + 4, 120, lbl, '#94a3b8', 10);
+  }
+
+  return y; // total height
+}
+
+// ─── WORKFLOW DEFINITIONS ──────────────────────────────────────────────────────
+
+function generate() {
+  ELS.length = 0;
+  _id = 0;
+
+  // ── WF 1 ─────────────────────────────────────────────────────────────────────
+  buildWF(0, '① Vehicle Session Lifecycle', [
+    { color: 'start',    pill: true, text: '🚗  VEHICLE ENTRY SCAN DETECTED\nPortNum = 1  ·  Gate 1 or Gate 2' },
+    { color: 'activity', text: '📋  Record Entry to Audit Log\nCard ID  ·  Gate  ·  Time  ·  Vehicle Type' },
+    { color: 'activity', text: '🅿  Check Parking Slot Assignment\nQuery allocations for this Card ID' },
+    { isDiamond: true,   text: 'Has parking\nslot assigned?' },
+    { color: 'alert',    text: '🔔  No Slot → Start Parking WF (WF7)\n(Detached child workflow)', arrowLabel: 'NO' },
+    { color: 'activity', text: '⏱  Start Overstay Alert WF (WF2)\nLaunch child — 24h timer begins NOW' },
+    { color: 'timer',    h: 80, text: '⏳  WORKFLOW SLEEPS HERE\nWaiting for exit signal\n(minutes · hours · days)' },
+    { isDiamond: true,   text: 'What\nhappens next?' },
+    { color: 'activity', arrowLabel: 'Vehicle exits', arrowColor: '#16a34a', text: '📤  Exit scan received  (PortNum=2)\n⛔ Cancel Overstay Timer  ·  Record Exit' },
+    { color: 'activity', text: '🅿  Release Parking Slot\n⏱ Compute Session Duration' },
+    { color: 'endOk',    pill: true, text: '✅  SESSION COMPLETE\nVehicle has exited normally' },
+  ]);
+
+  // ── WF 2 ─────────────────────────────────────────────────────────────────────
+  buildWF(1, '② Overstay Alert & Escalation', [
+    { color: 'start',    pill: true, text: '⏱  WORKFLOW 2 STARTS\nCalled by WF1 on vehicle entry' },
+    { color: 'timer',    h: 80, text: '⏳  WAIT: 24-HOUR DURABLE TIMER\nCounting from entry time\nSurvives server restarts — stored on disk' },
+    { isDiamond: true,   text: 'Vehicle exited\nbefore 24h?' },
+    { color: 'endOk',    pill: true, arrowLabel: 'YES', arrowColor: '#16a34a', text: '✅  WORKFLOW ENDS\nNo overstay — cancelled by WF1' },
+    { color: 'alert',    arrowLabel: 'NO — still inside', arrowColor: '#dc2626', text: '📧  SEND 24H WARNING EMAIL\nTo: Admin  ·  Card ID, Company, Duration' },
+    { color: 'timer',    text: '⏳  WAIT: 12 MORE HOURS' },
+    { isDiamond: true,   text: 'Still inside\nat 36 hours?' },
+    { color: 'alert',    arrowLabel: 'YES', text: '📧  SEND 36H ESCALATION\nTo: Admin  ·  "Vehicle inside 36 hours"' },
+    { color: 'timer',    text: '⏳  WAIT: 12 MORE HOURS' },
+    { isDiamond: true,   text: 'Still inside\nat 48 hours?' },
+    { color: 'alert',    arrowLabel: 'YES', text: '🚨  SEND 48H CRITICAL ALERT\nTo: Admin + Facility Manager' },
+    { color: 'timer',    text: '⏳  WAIT: 24 MORE HOURS' },
+    { color: 'alert',    text: '🔴  SEND 72H FINAL ALERT\nTo: Admin + Manager + Security Head' },
+    { color: 'endErr',   pill: true, text: '🔴  WORKFLOW ENDS\nMax escalation reached (72h)' },
+  ]);
+
+  // ── WF 3 ─────────────────────────────────────────────────────────────────────
+  buildWF(2, '③ Unauthorized Vehicle Approval', [
+    { color: 'start',    pill: true, text: '🚨  UNAUTHORIZED VEHICLE SCAN\nEntry with empty Company Code (PCode)' },
+    { color: 'activity', text: '📤  Notify Security Officer\n"Unknown vehicle at Gate X — please decide"' },
+    { color: 'activity', text: '🖥  Dashboard: "Pending Approval" Badge\nAll devices show PENDING status' },
+    { color: 'timer',    h: 80, text: '⏳  WAIT FOR SECURITY DECISION\nTimeout: 30 minutes' },
+    { isDiamond: true,   text: 'Response within\n30 minutes?' },
+    { color: 'signal',   arrowLabel: 'APPROVED', arrowColor: '#16a34a', text: '📩  Signal: "approval-granted"\nVehicle No. · Remark · Officer Name · Time' },
+    { color: 'activity', text: '💾  Save Approval Record on Server\nPermanent — visible from any device' },
+    { color: 'activity', text: '📡  Broadcast to All Dashboard Users\nAll open tabs update to "Allowed" badge' },
+    { color: 'endOk',    pill: true, text: '✅  APPROVED\nFull audit trail saved on server' },
+  ]);
+
+  // ── WF 4 ─────────────────────────────────────────────────────────────────────
+  buildWF(3, '④ Daily Summary Report', [
+    { color: 'start',    pill: true, text: '🕒  SCHEDULE: 11:59 PM EVERY NIGHT\nRuns on restart if server was down' },
+    { color: 'activity', text: '📊  Fetch Entry & Exit Stats\nTotal entries · exits · unique vehicles' },
+    { color: 'activity', text: '🏢  Fetch Currently Inside Count\nVehicles still parked + overstay count' },
+    { color: 'activity', text: '🚫  Fetch Unauthorized Count (NEW)\nHow many unknown entries today' },
+    { color: 'activity', text: '🏍  Fetch Vehicle Type Breakdown (NEW)\n2-Wheeler entries/exits · 4-Wheeler' },
+    { color: 'activity', text: '✍️  Generate Formatted HTML Email\nAll stats formatted for management' },
+    { color: 'activity', text: '📧  Send Email to Recipients\nAdmin + Facility Manager' },
+    { isDiamond: true,   text: 'Email sent\nsuccessfully?' },
+    { color: 'activity', arrowLabel: 'YES', arrowColor: '#16a34a', text: '📁  Archive Report Data\nStore permanently for audit trail' },
+    { color: 'endOk',    pill: true, text: '✅  DAILY REPORT COMPLETE\nEmail sent and archived' },
+  ]);
+
+  // ── WF 5 ─────────────────────────────────────────────────────────────────────
+  buildWF(4, '⑤ Weekly Analytics Report', [
+    { color: 'start',    pill: true, text: '📅  SCHEDULE: EVERY FRIDAY 11:00 PM\nCovers Mon–Fri of current week' },
+    { color: 'activity', text: '📊  Fetch Daily Traffic Per Day\nMon–Fri entry/exit counts' },
+    { color: 'activity', text: '⏰  Fetch Peak Hours Analysis\nTop 3 busiest time slots of the week' },
+    { color: 'activity', text: '🕐  Fetch Overstay Incidents\nAll vehicles >24h this week + company' },
+    { color: 'activity', text: '🚧  Fetch Gate Utilization\nGate 1 vs Gate 2 traffic % split' },
+    { color: 'activity', text: '🚫  Fetch Unauthorized Summary\nEntries, approvals, denials this week' },
+    { color: 'activity', text: '📈  Fetch Week-over-Week Trend\nCompare totals to previous week' },
+    { color: 'activity', text: '✍️  Generate Full Weekly Report Email\nRich HTML with all 6 sections' },
+    { color: 'activity', text: '📧  Send to Admin + Manager + Senior Mgmt\nRetry 5x with backoff if send fails' },
+    { color: 'activity', text: '📁  Archive Weekly Stats\nStored for next week comparison' },
+    { color: 'endOk',    pill: true, text: '✅  WEEKLY REPORT COMPLETE' },
+  ]);
+
+  // ── WF 6 ─────────────────────────────────────────────────────────────────────
+  buildWF(5, '⑥ Gate Health Monitor', [
+    { color: 'start',    pill: true, text: '🔌  SERVER BOOTS\nGate Monitor starts — runs forever (singleton)' },
+    { color: 'timer',    h: 80, text: '🔁  INFINITE MONITORING LOOP\n⏳ Wait 5 min (business hours)\n    or 30 min (after hours)' },
+    { isDiamond: true,   text: 'Business hours?\n(8 AM – 8 PM)' },
+    { color: 'activity', arrowLabel: 'YES', arrowColor: '#16a34a', text: '🔍  Query Gate 1 scan count (last 30 min)\nDevice: 14070001' },
+    { color: 'activity', text: '🔍  Query Gate 2 scan count (last 30 min)\nDevice: 24074151' },
+    { isDiamond: true,   text: 'Any gate\nsilent 30+ min?' },
+    { color: 'alert',    arrowLabel: 'YES', arrowColor: '#dc2626', text: '📧  GATE OFFLINE ALERT\nTo: Facility Manager (within 5 minutes)' },
+    { color: 'activity', text: '📝  Update Durable State\nGate X offline since [timestamp]' },
+    { isDiamond: true,   text: 'Both gates\noffline?' },
+    { color: 'alert',    h: 80, arrowLabel: 'YES', arrowColor: '#dc2626', text: '🔴  CRITICAL ALERT — Both Gates Offline\nAdmin + Manager + Senior Mgmt\nPossible network/power issue' },
+  ]);
+
+  // ── WF 7 ─────────────────────────────────────────────────────────────────────
+  // Updated: Fully automatic — no human assignment needed
+  // Quota available → auto-assign | Quota full → dual email + dashboard badge
+
+  const wf7X = wfCol(6);
+  let wf7Y = 0;
+
+  // Header
+  sectionLabel(wf7X, wf7Y, WF_W, '⑦ Parking Slot Management\n(Fully Automatic — Quota Based)', 'header');
+  wf7Y += 56 + GAP;
+
+  // START
+  const w7s1 = rect(wf7X + (WF_W - NW) / 2, wf7Y, NW, NH,
+    '🅿  VEHICLE ENTRY SCAN DETECTED\nTriggered by WF1 on every entry', 'start', true);
+  wf7Y += NH + GAP;
+
+  // Step 1
+  const w7s2 = rect(wf7X + (WF_W - NW) / 2, wf7Y, NW, NH,
+    '🔍  STEP 1: Fetch Company Parking Quota\nTotal Slots · Occupied · Available = Total − Occupied', 'activity');
+  wf7Y += NH + GAP;
+  arrow(w7s1, w7s2);
+
+  // Decision
+  const w7d1 = diamond(wf7X + (WF_W - DW) / 2, wf7Y, DW, DH, 'Available\nslots > 0 ?');
+  wf7Y += DH + GAP;
+  arrow(w7s2, w7d1);
+
+  // ── LEFT BRANCH: slots available ──────────────────────────────────────────
+  const leftX = wf7X - 10;
+  const rightX = wf7X + WF_W / 2 + 10;
+  const colW = WF_W / 2 - 20;
+  const nodeW = colW - 10;
+
+  let lyY = wf7Y;
+
+  const w7_l1 = rect(leftX, lyY, nodeW, NH,
+    '📊  STEP 2: Auto-Calculate Next Slot\nSystem picks next free slot · Format: PS-[N]/[Total]', 'activity');
+  lyY += NH + GAP;
+
+  const w7_l2 = rect(leftX, lyY, nodeW, NH,
+    '💾  STEP 3: Auto-Assign Slot to Vehicle\nRecord: Card ID · Slot · Company · Timestamp', 'activity');
+  lyY += NH + GAP;
+
+  const w7_l3 = rect(leftX, lyY, nodeW, NH,
+    '📡  STEP 4: Update Dashboard — All Users\nWebSocket broadcast · Slot shown in live table', 'activity');
+  lyY += NH + GAP;
+
+  const w7_ld = diamond(leftX + (nodeW - DW + 20) / 2, lyY, DW - 20, DH,
+    'Company parking\n≥ 80% full?');
+  lyY += DH + GAP;
+
+  // Sub-branch: near full warning
+  const w7_lw = rect(leftX, lyY, nodeW - 10, NH + 10,
+    '📧  LOW QUOTA WARNING\nTo: Company Admin + System Admin\n"Only [N] slot(s) remaining"', 'alert');
+  lyY += NH + 10 + GAP;
+
+  const w7_ldb = rect(leftX, lyY, nodeW - 10, NH - 10,
+    '🖥  Dashboard: "⚠ [Company] Nearly Full"\nWarning badge on Live Entry/Exit page', 'activity');
+  lyY += NH - 10 + GAP;
+
+  const w7_lend = rect(leftX, lyY, nodeW, NH,
+    '✅  SLOT AUTO-ASSIGNED\nVehicle allowed · No human action needed', 'endOk', true);
+
+  // Connect left branch
+  arrow(w7d1, w7_l1, '#16a34a');
+  label(leftX, wf7Y - 18, nodeW, 'YES — Slots Available', '#16a34a', 10);
+  arrow(w7_l1, w7_l2);
+  arrow(w7_l2, w7_l3);
+  arrow(w7_l3, w7_ld);
+  arrow(w7_ld, w7_lw, '#d97706');
+  arrow(w7_lw, w7_ldb);
+  arrow(w7_ldb, w7_lend);
+
+  // ── RIGHT BRANCH: quota full ───────────────────────────────────────────────
+  let ryY = wf7Y;
+
+  const w7_r1 = rect(rightX, ryY, nodeW, NH + 10,
+    '🔴  STEP 2: Quota Full — Cannot Assign\nAll [N] slots for [Company] are occupied', 'alert');
+  ryY += NH + 10 + GAP;
+
+  // Dual email label
+  label(rightX, ryY, nodeW, '📧  TWO EMAILS SENT SIMULTANEOUSLY', '#dc2626', 11);
+  ryY += 22;
+
+  // Email 1
+  const emailLeftX = rightX;
+  const emailW = (nodeW - 8) / 2;
+
+  const w7_e1 = rect(emailLeftX, ryY, emailW, NH + 30,
+    '📧  Email 1 → Company Admin\nSubject: "Parking Quota Full"\n· All [N] slots occupied\n· Vehicle [Card ID] at [time]\n· Please review or request more slots', 'alert');
+
+  const w7_e2 = rect(emailLeftX + emailW + 8, ryY, emailW, NH + 30,
+    '📧  Email 2 → System Admin\nSubject: "Parking Full Alert"\n· Company: [Company Name]\n· Quota: [N]/[N] (100% full)\n· Vehicle [Card ID] at [time]', 'alert');
+
+  ryY += NH + 30 + GAP;
+  arrow(w7_r1, w7_e1, '#dc2626');
+  arrow(w7_r1, w7_e2, '#dc2626');
+
+  const w7_r2 = rect(rightX, ryY, nodeW, NH + 10,
+    '🖥  STEP 3: Dashboard Badge — All Users\n"🔴 [Company] — Parking Full ([N]/[N])"\nRed badge via WebSocket broadcast', 'alert');
+  ryY += NH + 10 + GAP;
+  arrow(w7_e1, w7_r2, '#dc2626');
+  arrow(w7_e2, w7_r2, '#dc2626');
+
+  const w7_r3 = rect(rightX, ryY, nodeW, NH,
+    '📋  STEP 4: Record in Audit Log\nCard ID · Company · Entry Time · Reason: "Quota Full"', 'activity');
+  ryY += NH + GAP;
+  arrow(w7_r2, w7_r3);
+
+  const w7_rend = rect(rightX, ryY, nodeW, NH,
+    '🔴  QUOTA FULL — EVENT LOGGED\nCompany Admin + System Admin notified\nDashboard badge shown', 'endErr', true);
+  arrow(w7_r3, w7_rend);
+
+  // Connect decision to right branch
+  arrow(w7d1, w7_r1, '#dc2626');
+  label(rightX, wf7Y - 18, nodeW, 'NO — Quota Full', '#dc2626', 10);
+
+  // ── WF 8 ─────────────────────────────────────────────────────────────────────
+  buildWF(7, '⑧ Vehicle Registry Sync', [
+    { color: 'start',    pill: true, text: '⏰  SCHEDULE: EVERY 55 SECONDS\nBackground — never blocks live scans' },
+    { color: 'activity', h: 80, text: '📡  Fetch Vehicle Registry from DB\nPersonnel + PersonnelExtend2 tables\nRetry: 3x · Timeout: 30s per attempt' },
+    { isDiamond: true,   text: 'DB query\nsuccessful?' },
+    { color: 'activity', arrowLabel: 'YES', arrowColor: '#16a34a', text: '✅  Validate Fetched Data\nCount: total · 2-Wheelers · 4-Wheelers' },
+    { color: 'activity', text: '💾  Update In-Memory Cache\nLive scan path reads from this instantly' },
+    { color: 'activity', text: '🗄  Write to Backup Store\nRedis / SQLite — for crash recovery' },
+    { color: 'activity', text: '📝  Log Sync Result\nTimestamp · records · duration · stats' },
+    { color: 'endOk',    pill: true, text: '✅  SYNC COMPLETE\nCache fresh · Health check updated' },
+  ]);
+
+  // ─── Assemble the .excalidraw JSON ─────────────────────────────────────────
+  const out = {
+    type: 'excalidraw',
+    version: 2,
+    source: 'https://excalidraw.com',
+    elements: ELS,
+    appState: {
+      gridSize: null,
+      viewBackgroundColor: '#f8fafc',
+      currentItemFontFamily: 1,
+      currentItemFontSize: 16,
+      currentItemTextAlign: 'center',
+      zoom: { value: 0.7 },
+      scrollX: 80,
+      scrollY: 80,
+    },
+    files: {},
+  };
+
+  // ─── Download ──────────────────────────────────────────────────────────────
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Temporal_Workflows_CyberTowers.excalidraw';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+
+  document.getElementById('status').textContent =
+    `✅ Downloaded! ${ELS.length} elements across 8 workflows.`;
+}
+
+// Auto-generate on load
+window.addEventListener('load', () => setTimeout(generate, 300));
+</script>
+</body>
+</html>

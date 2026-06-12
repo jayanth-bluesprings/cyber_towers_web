@@ -1,0 +1,1881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cyber Towers — Vehicle Access System: Complete Flow Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --blue: #1a56db;
+    --blue-light: #e8f0fe;
+    --blue-mid: #3b82f6;
+    --green: #0f7140;
+    --green-light: #d1fae5;
+    --red: #be123c;
+    --red-light: #ffe4e6;
+    --orange: #c2410c;
+    --orange-light: #fff3e0;
+    --purple: #6b21a8;
+    --purple-light: #f3e8ff;
+    --yellow: #b45309;
+    --yellow-light: #fef9c3;
+    --grey: #374151;
+    --grey-light: #f3f4f6;
+    --grey-border: #e5e7eb;
+    --text: #111827;
+    --text-secondary: #6b7280;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    color: var(--text);
+    background: #fff;
+    font-size: 11pt;
+    line-height: 1.6;
+  }
+
+  /* ── COVER PAGE ─────────────────────────────── */
+  .cover {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 60px 40px;
+    background: linear-gradient(160deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
+    color: white;
+    page-break-after: always;
+  }
+  .cover .logo-area {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 16px;
+    padding: 24px 40px;
+    margin-bottom: 48px;
+    display: inline-flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .cover .building-icon {
+    font-size: 48px;
+  }
+  .cover .logo-text { text-align: left; }
+  .cover .logo-text .name { font-size: 22pt; font-weight: 700; letter-spacing: -0.5px; }
+  .cover .logo-text .sub { font-size: 11pt; opacity: 0.6; }
+  .cover h1 {
+    font-size: 36pt;
+    font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: 16px;
+    letter-spacing: -1px;
+  }
+  .cover h1 span { color: #60a5fa; }
+  .cover .tagline {
+    font-size: 14pt;
+    opacity: 0.7;
+    margin-bottom: 60px;
+    max-width: 560px;
+  }
+  .cover .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    width: 100%;
+    max-width: 600px;
+  }
+  .cover .meta-item {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .cover .meta-item .label { font-size: 8pt; opacity: 0.5; text-transform: uppercase; letter-spacing: 1px; }
+  .cover .meta-item .value { font-size: 12pt; font-weight: 600; margin-top: 4px; }
+  .cover .footer { position: absolute; bottom: 40px; opacity: 0.4; font-size: 9pt; }
+
+  /* ── PAGE LAYOUT ────────────────────────────── */
+  .page {
+    padding: 48px 52px;
+    max-width: 900px;
+    margin: 0 auto;
+    page-break-after: always;
+  }
+  .page:last-child { page-break-after: avoid; }
+
+  /* ── SECTION HEADERS ────────────────────────── */
+  .page-header {
+    border-bottom: 3px solid var(--blue);
+    padding-bottom: 16px;
+    margin-bottom: 32px;
+  }
+  .page-header .section-num {
+    font-size: 10pt;
+    font-weight: 600;
+    color: var(--blue);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 6px;
+  }
+  .page-header h2 {
+    font-size: 22pt;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  .page-header p {
+    margin-top: 8px;
+    color: var(--text-secondary);
+    font-size: 11pt;
+  }
+
+  /* ── TOC ───────────────────────────────────── */
+  .toc-entry {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    transition: background 0.2s;
+  }
+  .toc-entry:nth-child(odd) { background: var(--grey-light); }
+  .toc-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 14px;
+    flex-shrink: 0;
+  }
+  .toc-entry .title { font-weight: 500; flex: 1; }
+  .toc-entry .desc { font-size: 9pt; color: var(--text-secondary); }
+  .toc-entry .pg { font-weight: 600; color: var(--blue); margin-left: 12px; font-size: 10pt; }
+
+  /* ── CALLOUT BOXES ──────────────────────────── */
+  .callout {
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    display: flex;
+    gap: 12px;
+  }
+  .callout.info { background: var(--blue-light); border-left: 4px solid var(--blue); }
+  .callout.success { background: var(--green-light); border-left: 4px solid var(--green); }
+  .callout.warning { background: var(--orange-light); border-left: 4px solid var(--orange); }
+  .callout.danger { background: var(--red-light); border-left: 4px solid var(--red); }
+  .callout.purple { background: var(--purple-light); border-left: 4px solid var(--purple); }
+  .callout-icon { font-size: 18px; margin-top: 1px; flex-shrink: 0; }
+  .callout-body .callout-title { font-weight: 600; font-size: 11pt; margin-bottom: 4px; }
+  .callout-body p { font-size: 10pt; color: var(--grey); line-height: 1.5; }
+
+  /* ── FLOW DIAGRAMS ──────────────────────────── */
+  .flow-container {
+    margin: 24px 0;
+  }
+  .flow-title {
+    font-size: 13pt;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .flow-title .badge {
+    background: var(--blue);
+    color: white;
+    font-size: 8pt;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-weight: 600;
+  }
+
+  /* ── STEP BLOCKS ────────────────────────────── */
+  .steps { display: flex; flex-direction: column; gap: 0; }
+  .step {
+    display: flex;
+    gap: 0;
+    position: relative;
+  }
+  .step-left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 44px;
+    flex-shrink: 0;
+  }
+  .step-num {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 12pt;
+    flex-shrink: 0;
+    z-index: 1;
+  }
+  .step-line {
+    width: 2px;
+    background: var(--grey-border);
+    flex: 1;
+    min-height: 20px;
+  }
+  .step:last-child .step-line { display: none; }
+  .step-body {
+    flex: 1;
+    padding: 0 0 24px 12px;
+    padding-top: 4px;
+  }
+  .step-body .step-label {
+    font-weight: 600;
+    font-size: 11pt;
+    margin-bottom: 4px;
+  }
+  .step-body .step-desc {
+    font-size: 10pt;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+  .step-body .step-tech {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tag {
+    font-size: 8.5pt;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+  }
+  .tag.blue { background: var(--blue-light); color: var(--blue); }
+  .tag.green { background: var(--green-light); color: var(--green); }
+  .tag.red { background: var(--red-light); color: var(--red); }
+  .tag.orange { background: var(--orange-light); color: var(--orange); }
+  .tag.purple { background: var(--purple-light); color: var(--purple); }
+  .tag.grey { background: var(--grey-light); color: var(--grey); }
+  .tag.yellow { background: var(--yellow-light); color: var(--yellow); }
+
+  /* ── DECISION TREE ──────────────────────────── */
+  .decision-tree {
+    border: 1px solid var(--grey-border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 16px 0;
+  }
+  .dt-header {
+    padding: 12px 18px;
+    font-weight: 700;
+    font-size: 11pt;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .dt-row {
+    display: flex;
+    border-top: 1px solid var(--grey-border);
+  }
+  .dt-condition {
+    flex: 0 0 220px;
+    padding: 12px 16px;
+    background: var(--grey-light);
+    font-size: 10pt;
+    font-weight: 500;
+    border-right: 1px solid var(--grey-border);
+    display: flex;
+    align-items: center;
+  }
+  .dt-outcome {
+    flex: 1;
+    padding: 12px 16px;
+    font-size: 10pt;
+    display: flex;
+    align-items: center;
+  }
+  .dt-wf {
+    flex: 0 0 120px;
+    padding: 12px 16px;
+    font-size: 9pt;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    border-left: 1px solid var(--grey-border);
+  }
+
+  /* ── WORKFLOW CARDS ─────────────────────────── */
+  .wf-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .wf-card {
+    border: 1px solid var(--grey-border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .wf-card-header {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .wf-card-header .wf-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9pt;
+    font-weight: 700;
+    opacity: 0.8;
+  }
+  .wf-card-header .wf-name {
+    font-weight: 700;
+    font-size: 11pt;
+    margin-top: 2px;
+  }
+  .wf-card-body {
+    padding: 12px 16px;
+    font-size: 10pt;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+  .wf-card-body ul { padding-left: 16px; }
+  .wf-card-body li { margin-bottom: 4px; }
+  .wf-card-footer {
+    padding: 8px 16px;
+    background: var(--grey-light);
+    font-size: 9pt;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-secondary);
+    border-top: 1px solid var(--grey-border);
+  }
+
+  /* ── TIMELINE ───────────────────────────────── */
+  .timeline {
+    position: relative;
+    margin: 24px 0;
+    padding-left: 28px;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 8px;
+    bottom: 8px;
+    width: 3px;
+    background: var(--grey-border);
+    border-radius: 2px;
+  }
+  .timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+  }
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -24px;
+    top: 8px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    border: 2px solid white;
+  }
+  .timeline-item .tl-header {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
+  }
+  .timeline-item .tl-title { font-weight: 600; font-size: 11pt; }
+  .timeline-item .tl-body {
+    background: var(--grey-light);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 10pt;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  /* ── DATA TABLE ─────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10pt;
+    margin: 16px 0;
+  }
+  thead tr { background: var(--blue); color: white; }
+  thead th { padding: 10px 14px; text-align: left; font-weight: 600; }
+  tbody tr:nth-child(even) { background: var(--grey-light); }
+  tbody td { padding: 9px 14px; border-bottom: 1px solid var(--grey-border); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  /* ── LEDGER / STATUS ────────────────────────── */
+  .status-pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 8.5pt;
+    font-weight: 600;
+  }
+  .pill-green { background: var(--green-light); color: var(--green); }
+  .pill-red { background: var(--red-light); color: var(--red); }
+  .pill-orange { background: var(--orange-light); color: var(--orange); }
+  .pill-blue { background: var(--blue-light); color: var(--blue); }
+  .pill-purple { background: var(--purple-light); color: var(--purple); }
+  .pill-grey { background: var(--grey-light); color: var(--grey); }
+
+  /* ── CODE BLOCK ─────────────────────────────── */
+  .code-block {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 8px;
+    padding: 16px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9pt;
+    line-height: 1.7;
+    margin: 12px 0;
+    overflow: hidden;
+  }
+  .code-block .cm { color: #64748b; }
+  .code-block .ck { color: #93c5fd; }
+  .code-block .cs { color: #6ee7b7; }
+  .code-block .cn { color: #fca5a5; }
+
+  /* ── SCENARIO BOX ───────────────────────────── */
+  .scenario {
+    border: 2px solid;
+    border-radius: 12px;
+    margin: 20px 0;
+    overflow: hidden;
+  }
+  .scenario-header {
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .scenario-header .scenario-icon { font-size: 24px; }
+  .scenario-header .scenario-title { font-size: 14pt; font-weight: 700; }
+  .scenario-header .scenario-sub { font-size: 10pt; opacity: 0.7; margin-top: 2px; }
+  .scenario-body { padding: 20px; }
+
+  .scenario.green { border-color: #059669; }
+  .scenario.green .scenario-header { background: #d1fae5; }
+  .scenario.red { border-color: #dc2626; }
+  .scenario.red .scenario-header { background: #fee2e2; }
+  .scenario.orange { border-color: #d97706; }
+  .scenario.orange .scenario-header { background: #fef3c7; }
+  .scenario.blue { border-color: #2563eb; }
+  .scenario.blue .scenario-header { background: #dbeafe; }
+  .scenario.purple { border-color: #7c3aed; }
+  .scenario.purple .scenario-header { background: #ede9fe; }
+
+  /* ── DIVIDER ─────────────────────────────────── */
+  .divider {
+    height: 1px;
+    background: var(--grey-border);
+    margin: 28px 0;
+  }
+
+  /* ── TWO COLUMN ─────────────────────────────── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 16px 0; }
+  .two-col.asymmetric { grid-template-columns: 1.4fr 1fr; }
+
+  /* ── INFO BOX ───────────────────────────────── */
+  .info-box {
+    border: 1px solid var(--grey-border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .info-box .ib-title {
+    font-weight: 700; font-size: 10pt;
+    margin-bottom: 10px;
+    color: var(--text);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .info-box ul { padding-left: 16px; }
+  .info-box li { font-size: 10pt; color: var(--text-secondary); margin-bottom: 5px; line-height: 1.4; }
+  .info-box li strong { color: var(--text); }
+
+  /* ── SIGNAL FLOW ────────────────────────────── */
+  .signal-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--grey-light);
+    border-radius: 8px;
+    margin-bottom: 6px;
+  }
+  .signal-row .sig-from, .signal-row .sig-to {
+    background: white;
+    border: 1px solid var(--grey-border);
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 9.5pt;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .signal-row .sig-arrow {
+    display: flex; flex: 1; align-items: center;
+    color: var(--text-secondary);
+    font-size: 9pt;
+    gap: 6px;
+  }
+  .signal-row .sig-arrow::before, .signal-row .sig-arrow::after {
+    content: ''; height: 1px; background: var(--grey-border); flex: 1;
+  }
+
+  /* ── PRINT STYLES ───────────────────────────── */
+  @media print {
+    body { font-size: 10pt; }
+    .page { padding: 32px 40px; }
+    .cover { min-height: unset; padding: 80px 60px; }
+    @page { margin: 0; size: A4; }
+  }
+
+  /* ── FOOTER STRIP ───────────────────────────── */
+  .page-footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--grey-border);
+    display: flex;
+    justify-content: space-between;
+    font-size: 8.5pt;
+    color: var(--text-secondary);
+  }
+
+  /* ── BIG NUMBER ─────────────────────────────── */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin: 20px 0;
+  }
+  .stat-box {
+    border: 1px solid var(--grey-border);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+  }
+  .stat-box .stat-num { font-size: 28pt; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+  .stat-box .stat-label { font-size: 9pt; color: var(--text-secondary); line-height: 1.3; }
+
+  h3 { font-size: 13pt; font-weight: 700; margin: 24px 0 12px; }
+  h4 { font-size: 11pt; font-weight: 600; margin: 16px 0 8px; color: var(--blue); }
+  p { margin-bottom: 10px; line-height: 1.6; font-size: 10.5pt; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ COVER PAGE ═══════════════ -->
+<div class="cover">
+  <div class="logo-area">
+    <div class="building-icon">🏢</div>
+    <div class="logo-text">
+      <div class="name">CYBER TOWERS</div>
+      <div class="sub">Hyderabad — Vehicle Access Control System</div>
+    </div>
+  </div>
+  <h1>Complete Vehicle<br><span>Entry to Exit</span> Flow Guide</h1>
+  <p class="tagline">Every scenario, every workflow, every decision — fully documented for operations, security, and development teams.</p>
+  <div class="meta-grid">
+    <div class="meta-item">
+      <div class="label">Workflows</div>
+      <div class="value">7 Active</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Scenarios Covered</div>
+      <div class="value">5 Cases</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Technology</div>
+      <div class="value">Temporal.io</div>
+    </div>
+  </div>
+  <div class="footer">Confidential — Bluesprings AI × Cyber Towers | 2026</div>
+</div>
+
+<!-- ═══════════════ PAGE 2: TABLE OF CONTENTS ═══════════════ -->
+<div class="page">
+  <div class="page-header">
+    <div class="section-num">Navigation</div>
+    <h2>Table of Contents</h2>
+    <p>This document covers all vehicle access scenarios from gate scan to exit, and the Temporal workflows that power each one.</p>
+  </div>
+
+  <div class="toc-entry">
+    <div class="toc-dot" style="background:#1a56db"></div>
+    <div class="title">System Overview — How It Works</div>
+    <div class="desc">Components, technology stack, LED output, and key concepts</div>
+  </div>
+  <div class="toc-entry">
+    <div class="toc-dot" style="background:#059669"></div>
+    <div class="title">Case 1 — Authorized Entry (Normal)</div>
+    <div class="desc">Valid card, company has quota available → allowed instantly</div>
+  </div>
+  <div class="toc-entry">
+    <div class="toc-dot" style="background:#dc2626"></div>
+    <div class="title">Case 2 — Unauthorized Vehicle</div>
+    <div class="desc">Unknown card or no company code → security review required</div>
+  </div>
+  <div class="toc-entry">
+    <div class="toc-dot" style="background:#d97706"></div>
+    <div class="title">Case 3 — Company Quota Full</div>
+    <div class="desc">Valid card but company parking slots exhausted → override flow</div>
+  </div>
+  <div class="toc-entry">
+    <div class="toc-dot" style="background:#7c3aed"></div>
+    <div class="title">Case 4 — Vehicle Exit</div>
+    <div class="desc">Exit scan received → slot freed, records closed, alerts cancelled</div>
+  </div>
+  <div class="toc-entry">
+    <div class="toc-dot" style="background:#0284c7"></div>
+    <div class="title">Case 5 — Scheduled Reports</div>
+    <div class="desc">Daily (WF4) and Weekly (WF5) automated email reports to management</div>
+  </div>
+  <div class="toc-entry">
+    <div class="toc-dot" style="background:#374151"></div>
+    <div class="title">Workflow Reference — All 7 Workflows</div>
+    <div class="desc">WF1–WF9 specifications, triggers, and signals</div>
+  </div>
+  <div class="toc-entry">
+    <div class="toc-dot" style="background:#374151"></div>
+    <div class="title">Signal Communication Map</div>
+    <div class="desc">How workflows talk to each other via Temporal signals</div>
+  </div>
+  <div class="toc-entry">
+    <div class="toc-dot" style="background:#374151"></div>
+    <div class="title">Data Flow — Dashboard & Reports</div>
+    <div class="desc">Two data sources: CardRecord DB + in-memory temporalEvents store</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="callout info">
+    <div class="callout-icon">💡</div>
+    <div class="callout-body">
+      <div class="callout-title">Important: No Physical Gate</div>
+      <p>Cyber Towers does not have an automated barrier gate. All vehicle control is done through an <strong>LED Display Panel</strong> at each entry point. When a workflow "allows" or "denies" a vehicle, it means the LED panel shows the appropriate message to the security guard, who manually acts on it.</p>
+    </div>
+  </div>
+
+  <div class="stat-row">
+    <div class="stat-box">
+      <div class="stat-num" style="color:#1a56db">WF1</div>
+      <div class="stat-label">Core Entry/Exit<br>Master Workflow</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" style="color:#dc2626">WF3</div>
+      <div class="stat-label">Unauthorized<br>Approval</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" style="color:#d97706">WF9</div>
+      <div class="stat-label">Quota Override<br>Request</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" style="color:#059669">WF2</div>
+      <div class="stat-label">Overstay<br>Alert Monitor</div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>Cyber Towers — Vehicle Access System</span>
+    <span>Page 2</span>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE 3: SYSTEM OVERVIEW ═══════════════ -->
+<div class="page">
+  <div class="page-header">
+    <div class="section-num">Section 1</div>
+    <h2>System Overview</h2>
+    <p>How all the pieces fit together — hardware, software, and workflow engine.</p>
+  </div>
+
+  <h3>What Happens When a Vehicle Scans?</h3>
+  <p>Every vehicle carries an RFID card. When it approaches the gate, the driver holds the card to the scanner. The TimeWatch RFID reader sends a scan event to the backend server, which then triggers a Temporal workflow to decide what happens next.</p>
+
+  <div class="two-col">
+    <div class="info-box">
+      <div class="ib-title">🔧 Hardware Components</div>
+      <ul>
+        <li><strong>RFID Card Reader</strong> — reads the card number (CardID) when a vehicle approaches</li>
+        <li><strong>LED Display Panel</strong> — shows ALLOW / DENY message to security guard and driver</li>
+        <li><strong>TimeWatch Server</strong> — records all scans into the SQL database (CardRecord table)</li>
+        <li><strong>Security Desk PC</strong> — where the guard monitors the dashboard and takes actions</li>
+      </ul>
+    </div>
+    <div class="info-box">
+      <div class="ib-title">💻 Software Components</div>
+      <ul>
+        <li><strong>Backend</strong> — Node.js/Express on port 5001. Receives scan events, triggers workflows</li>
+        <li><strong>Frontend Dashboard</strong> — React app on port 3000. Live view + Reports + Config</li>
+        <li><strong>Temporal Server</strong> — Workflow engine on port 7233. Makes all decisions durably</li>
+        <li><strong>MSSQL Database</strong> — TimeWatch DB. Stores CardRecord, Personnel, AuditLog tables</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>What is Temporal?</h3>
+  <div class="callout purple">
+    <div class="callout-icon">⚡</div>
+    <div class="callout-body">
+      <div class="callout-title">Temporal = Durable, Reliable Decision Engine</div>
+      <p>Temporal is a workflow engine that runs code in a crash-proof way. If the server restarts mid-workflow (e.g., while waiting 10 minutes for a security decision), Temporal automatically resumes exactly where it left off. Each vehicle entry creates its own workflow instance that runs independently until the vehicle exits.</p>
+    </div>
+  </div>
+
+  <h3>The Decision Tree — Quick Reference</h3>
+
+  <div class="decision-tree">
+    <div class="dt-header" style="background:#1e3a5f; color:white;">
+      <span>🚗</span> Vehicle Scans RFID Card → What happens next?
+    </div>
+    <div class="dt-row">
+      <div class="dt-condition">Card known + Company has free slots</div>
+      <div class="dt-outcome"><span class="status-pill pill-green">✓ Allowed immediately</span> — LED shows welcome message, entry logged</div>
+      <div class="dt-wf" style="color:#059669">WF1</div>
+    </div>
+    <div class="dt-row">
+      <div class="dt-condition">Card unknown / No company code</div>
+      <div class="dt-outcome"><span class="status-pill pill-red">⚠ Held for review</span> — LED shows "Unauthorized", security gets alert</div>
+      <div class="dt-wf" style="color:#dc2626">WF1 → WF3</div>
+    </div>
+    <div class="dt-row">
+      <div class="dt-condition">Card known + Company quota full</div>
+      <div class="dt-outcome"><span class="status-pill pill-orange">⛔ Blocked</span> — LED shows "Parking Full", override request option shown</div>
+      <div class="dt-wf" style="color:#d97706">WF1 → WF9</div>
+    </div>
+    <div class="dt-row">
+      <div class="dt-condition">Exit scan (PortNum = 2)</div>
+      <div class="dt-outcome"><span class="status-pill pill-blue">↩ Exit recorded</span> — Slot freed, overstay timer cancelled</div>
+      <div class="dt-wf" style="color:#1a56db">WF1 signal</div>
+    </div>
+  </div>
+
+  <h3>PortNum — Entry vs Exit</h3>
+  <div class="two-col">
+    <div class="info-box" style="border-color:#059669">
+      <div class="ib-title" style="color:#059669">PortNum = 1 → ENTRY</div>
+      <ul>
+        <li>Vehicle is entering the building premises</li>
+        <li>Triggers a new WF1 workflow instance</li>
+        <li>Slot count increases by 1 (if authorized)</li>
+        <li>Overstay monitoring (WF2) starts</li>
+      </ul>
+    </div>
+    <div class="info-box" style="border-color:#7c3aed">
+      <div class="ib-title" style="color:#7c3aed">PortNum = 2 → EXIT</div>
+      <ul>
+        <li>Vehicle is leaving the building premises</li>
+        <li>Sends <code>exitSignal</code> to the active WF1 instance</li>
+        <li>Slot count decreases by 1</li>
+        <li>Overstay monitoring (WF2) cancelled</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>Cyber Towers — Vehicle Access System</span>
+    <span>Page 3</span>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE 4: CASE 1 — AUTHORIZED ENTRY ═══════════════ -->
+<div class="page">
+  <div class="page-header">
+    <div class="section-num">Section 2 — Case 1</div>
+    <h2>Authorized Entry (Normal Case)</h2>
+    <p>The most common scenario. A registered employee or visitor with a valid RFID card arrives and their company has available parking slots.</p>
+  </div>
+
+  <div class="scenario green">
+    <div class="scenario-header">
+      <div class="scenario-icon">✅</div>
+      <div>
+        <div class="scenario-title">Access Granted — Entry Allowed</div>
+        <div class="scenario-sub">Valid card · Company quota not full · PortNum = 1</div>
+      </div>
+    </div>
+    <div class="scenario-body">
+
+      <div class="flow-title">
+        Step-by-Step Flow
+        <span class="badge">WF1 Active</span>
+      </div>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#dbeafe; color:#1a56db">1</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">Vehicle scans RFID card at gate</div>
+            <div class="step-desc">The driver holds their RFID card to the reader. TimeWatch logs a CardRecord entry. The backend receives the scan event via a DB poll or webhook.</div>
+            <div class="step-tech"><span class="tag grey">PortNum=1</span><span class="tag grey">CardID detected</span><span class="tag blue">TimeWatch DB</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#dbeafe; color:#1a56db">2</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">Backend triggers WF1 on Temporal</div>
+            <div class="step-desc">The backend calls <code>temporalClient.start('wf1EntryExit', { cardId, vehicleNumber, gate, timestamp, portNum })</code>. A new workflow instance is created with a unique ID like <code>wf1-5248003-2026-06-10T10:30</code>.</div>
+            <div class="step-tech"><span class="tag blue">WF1 starts</span><span class="tag grey">Temporal port 7233</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#dbeafe; color:#1a56db">3</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">WF1 looks up the card in the database</div>
+            <div class="step-desc">Activity <code>db.lookupPersonnel(cardId)</code> queries the Personnel table. Returns the person's name, company code (PCode), and company name. If PCode is empty or <code>'-'</code>, the vehicle is unauthorized → handled in Case 2.</div>
+            <div class="step-tech"><span class="tag grey">lookupPersonnel()</span><span class="tag blue">Personnel table</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#dbeafe; color:#1a56db">4</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">WF1 checks company parking quota</div>
+            <div class="step-desc">Activity <code>db.getCompanyQuota(pCode)</code> checks how many slots the company has and how many are currently occupied. If <code>occupiedSlots &lt; totalSlots</code>, the quota is fine and entry proceeds. If quota is full → handled in Case 3.</div>
+            <div class="step-tech"><span class="tag grey">getCompanyQuota()</span><span class="tag green">occupiedSlots &lt; totalSlots</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#d1fae5; color:#059669">5</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">LED panel shows "ALLOWED" message</div>
+            <div class="step-desc">Activity <code>gate.displayOnLED(gate, "✓ ALLOWED — Welcome, [Name]. Slot X/Y")</code> is called. The LED panel at the entry gate lights up with the green welcome message. Security guard sees this and lets the vehicle through.</div>
+            <div class="step-tech"><span class="tag green">displayOnLED()</span><span class="tag green">✓ ALLOWED</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#d1fae5; color:#059669">6</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">Slot count incremented + Audit log written</div>
+            <div class="step-desc"><code>db.incrementSlot(pCode)</code> adds 1 to the occupied count for this company. <code>db.writeAuditLog({ eventType: 'ENTRY_AUTHORIZED', ... })</code> creates a permanent record of the entry.</div>
+            <div class="step-tech"><span class="tag grey">incrementSlot()</span><span class="tag grey">writeAuditLog()</span><span class="tag green">ENTRY_AUTHORIZED</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#d1fae5; color:#059669">7</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">WF2 (Overstay Monitor) starts in parallel</div>
+            <div class="step-desc">WF1 calls <code>startChild('wf2OverstayAlert', ...)</code> to launch WF2 as a background monitor. WF2 sleeps for 24 hours. If the vehicle is still inside after 24h, WF2 sends an alert email. WF1 continues independently — it does NOT wait for WF2.</div>
+            <div class="step-tech"><span class="tag blue">WF2 starts</span><span class="tag grey">startChild (ABANDON)</span><span class="tag orange">24h timer</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#d1fae5; color:#059669">8</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">WF7 (Dashboard Slot Tracker) starts in parallel</div>
+            <div class="step-desc">WF1 calls <code>startChild('wf7ParkingSlotTracker', ...)</code>. WF7 broadcasts the updated slot count to the frontend dashboard via WebSocket, so the security monitor shows the latest occupancy in real time.</div>
+            <div class="step-tech"><span class="tag blue">WF7 starts</span><span class="tag grey">WebSocket broadcast</span><span class="tag blue">Dashboard updates</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#ede9fe; color:#7c3aed">9</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">WF1 waits for exit signal (dormant)</div>
+            <div class="step-desc">WF1 now enters a <code>wf.condition(() => exited)</code> wait state. It is sleeping — consuming zero CPU — waiting for the <code>exitSignal</code> to arrive. This is Temporal's durable sleep: even if the server restarts, WF1 will resume waiting when the server comes back up.</div>
+            <div class="step-tech"><span class="tag purple">WF1 dormant</span><span class="tag grey">wf.condition()</span><span class="tag grey">awaiting exitSignal</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout success">
+        <div class="callout-icon">✅</div>
+        <div class="callout-body">
+          <div class="callout-title">What the security guard sees on the LED</div>
+          <p><code>✓ ALLOWED — Welcome, Rahul Sharma. Slot 7/22</code></p>
+          <p>The guard manually raises the barrier (or waves the vehicle through) and the vehicle enters. The dashboard slot count updates within seconds.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>Cyber Towers — Vehicle Access System</span>
+    <span>Page 4</span>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE 5: CASE 2 — UNAUTHORIZED ═══════════════ -->
+<div class="page">
+  <div class="page-header">
+    <div class="section-num">Section 3 — Case 2</div>
+    <h2>Unauthorized Vehicle</h2>
+    <p>A vehicle scans whose RFID card is either unknown to the system or has no company code (PCode is empty or '-'). Security must decide within 10 minutes.</p>
+  </div>
+
+  <div class="scenario red">
+    <div class="scenario-header">
+      <div class="scenario-icon">🚨</div>
+      <div>
+        <div class="scenario-title">Unauthorized — Security Decision Required</div>
+        <div class="scenario-sub">Unknown card / PCode empty · Security has 10 minutes to decide</div>
+      </div>
+    </div>
+    <div class="scenario-body">
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#fee2e2; color:#dc2626">1</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">WF1 detects empty PCode → triggers WF3</div>
+            <div class="step-desc">After looking up the card, WF1 finds that PCode is empty or <code>'-'</code>. This means the person is not registered with any company in the system. WF1 calls <code>executeChild('wf3UnauthorizedApproval', ...)</code>. <strong>WF1 pauses and waits for WF3 to finish.</strong></div>
+            <div class="step-tech"><span class="tag red">WF3 starts</span><span class="tag grey">executeChild (WF1 waits)</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#fee2e2; color:#dc2626">2</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">WF3: LED shows "Unauthorized" + security alerted</div>
+            <div class="step-desc">WF3 immediately: (a) displays <code>UNAUTHORIZED — Contacting security. Please wait.</code> on the LED; (b) broadcasts the scan to the live dashboard so the security guard sees it; (c) sends an alert email to the security desk with the vehicle details.</div>
+            <div class="step-tech"><span class="tag red">displayOnLED()</span><span class="tag blue">broadcastDeniedScan()</span><span class="tag grey">sendUnauthorizedAlert()</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#fee2e2; color:#dc2626">3</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">WF3: Audit log written + 10-minute timer starts</div>
+            <div class="step-desc">A <code>ENTRY_DENIED_UNAUTHORIZED</code> audit log entry is written. WF3 then enters a <code>wf.condition(() => decision !== null, '10 minutes')</code> wait. The workflow is dormant — waiting for a security decision signal from the dashboard.</div>
+            <div class="step-tech"><span class="tag grey">ENTRY_DENIED_UNAUTHORIZED</span><span class="tag orange">10 min timer</span><span class="tag purple">dormant</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <h3>Three Possible Outcomes from WF3</h3>
+
+  <div class="scenario blue" style="margin-bottom:16px">
+    <div class="scenario-header">
+      <div class="scenario-icon">✅</div>
+      <div>
+        <div class="scenario-title">Outcome A: Security APPROVES the vehicle</div>
+        <div class="scenario-sub">Guard clicks "Allow" on dashboard → sends securityDecisionSignal</div>
+      </div>
+    </div>
+    <div class="scenario-body">
+      <p>The security guard reviews the vehicle, verifies the visitor, and clicks <strong>Allow</strong> on the dashboard. They fill in the vehicle number and optionally a visitor company name and reason. The dashboard posts to <code>POST /api/security-decision</code>, which signals Temporal WF3.</p>
+      <div class="steps" style="margin-top:12px">
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:#dbeafe;color:#1a56db">A1</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-label">WF3 receives <code>securityDecisionSignal</code> with <code>action: 'approve'</code></div>
+            <div class="step-desc">LED shows <code>✓ ALLOWED — Welcome. Approved by security.</code> An approval confirmation email is sent. Audit log: <code>UNAUTHORIZED_APPROVED_BY_SECURITY</code>. WF3 returns <code>{ approved: true }</code> to WF1.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:#dbeafe;color:#1a56db">A2</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-label">WF1 resumes — no quota change for unauthorized vehicles</div>
+            <div class="step-desc">WF1 checks the returned value: <code>wf3Result.approved === true</code>. WF1 logs <code>UNAUTHORIZED_ENTRY_STARTED</code>, starts WF2 (overstay monitor), and enters dormant state waiting for the exit signal. Note: no slot count is changed — unauthorized vehicles don't occupy company quota.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scenario red" style="margin-bottom:16px">
+    <div class="scenario-header">
+      <div class="scenario-icon">❌</div>
+      <div>
+        <div class="scenario-title">Outcome B: Security DENIES the vehicle</div>
+        <div class="scenario-sub">Guard clicks "Deny" on dashboard → sends securityDecisionSignal</div>
+      </div>
+    </div>
+    <div class="scenario-body">
+      <p>The security guard decides the vehicle should not be admitted. Clicks <strong>Deny</strong> on the dashboard with an optional reason.</p>
+      <div class="steps" style="margin-top:12px">
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:#fee2e2;color:#dc2626">B1</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-label">WF3 receives <code>action: 'deny'</code></div>
+            <div class="step-desc">LED shows <code>✗ DENIED — Access refused by security.</code> A DENIED event is broadcast to the dashboard (vehicle shows as "Access Denied" in Reports). Audit log: <code>UNAUTHORIZED_DENIED_BY_SECURITY</code>. WF3 returns <code>{ approved: false }</code>.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:#fee2e2;color:#dc2626">B2</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-label">WF1 receives result and ends</div>
+            <div class="step-desc">WF1 checks <code>wf3Result.approved === false</code> and immediately returns. No WF2, no slot change, no exit tracking. The workflow instance closes completely.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scenario orange">
+    <div class="scenario-header">
+      <div class="scenario-icon">⏱️</div>
+      <div>
+        <div class="scenario-title">Outcome C: No response in 10 minutes (Timeout)</div>
+        <div class="scenario-sub">Security did not act within the 10-minute window</div>
+      </div>
+    </div>
+    <div class="scenario-body">
+      <p>The <code>wf.condition()</code> timer expires. WF3 automatically proceeds with denial — no human action needed.</p>
+      <div class="callout warning" style="margin-top:8px">
+        <div class="callout-icon">⚠️</div>
+        <div class="callout-body">
+          <div class="callout-title">Auto-denial after 10 minutes</div>
+          <p>LED shows <code>✗ DENIED — No security response. Access not granted.</code> A DENIED event is broadcast. Audit log: <code>UNAUTHORIZED_TIMEOUT</code>. WF3 returns <code>{ approved: false }</code>. WF1 ends. The vehicle must leave.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>Cyber Towers — Vehicle Access System</span>
+    <span>Page 5</span>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE 6: CASE 3 — QUOTA FULL ═══════════════ -->
+<div class="page">
+  <div class="page-header">
+    <div class="section-num">Section 4 — Case 3</div>
+    <h2>Company Quota Full — Override Flow</h2>
+    <p>A registered employee scans their card but all parking slots allocated to their company are already occupied. An override request can be made to allow entry above quota.</p>
+  </div>
+
+  <div class="scenario orange">
+    <div class="scenario-header">
+      <div class="scenario-icon">🅿️</div>
+      <div>
+        <div class="scenario-title">Quota Exceeded — Override Request Available</div>
+        <div class="scenario-sub">Valid card · occupiedSlots ≥ totalSlots · WF9 triggered</div>
+      </div>
+    </div>
+    <div class="scenario-body">
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#fef3c7;color:#d97706">1</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">WF1 detects quota full → triggers WF9</div>
+            <div class="step-desc">WF1 finds <code>occupiedSlots &gt;= totalSlots</code> for the company. Calls <code>executeChild('wf9QuotaOverride', input, personnel, quota)</code>. WF1 pauses and waits for WF9 to complete.</div>
+            <div class="step-tech"><span class="tag orange">WF9 starts</span><span class="tag grey">executeChild (WF1 waits)</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#fef3c7;color:#d97706">2</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">WF9: LED shows "Parking Full" + Company Admin emailed</div>
+            <div class="step-desc">LED shows <code>✗ PARKING FULL 10/10 — Please park outside.</code> The company admin receives an informational email: "Your employee [Name] was denied entry due to full quota." Audit log: <code>ENTRY_DENIED_QUOTA_FULL</code>.</div>
+            <div class="step-tech"><span class="tag orange">displayOnLED()</span><span class="tag grey">sendQuotaFullEmail()</span><span class="tag grey">ENTRY_DENIED_QUOTA_FULL</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#fef3c7;color:#d97706">3</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">WF9 waits 5 minutes for override request</div>
+            <div class="step-desc">The security desk can click "Request Override" on the dashboard. This sends an <code>overrideRequestSignal</code> to WF9. WF9 waits up to 5 minutes for this signal.</div>
+            <div class="step-tech"><span class="tag orange">5 min timer</span><span class="tag purple">overrideRequestSignal</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="divider"></div>
+  <h3>WF9 Outcomes (Three Paths)</h3>
+
+  <!-- Path A: No Override Requested -->
+  <div style="border:1px solid #e5e7eb; border-radius:10px; padding:16px; margin-bottom:14px;">
+    <div style="font-weight:700; font-size:11pt; margin-bottom:8px;">Path A — No override requested (5 min timeout)</div>
+    <p style="font-size:10pt; color:#6b7280; margin-bottom:8px;">Security does not click "Request Override" within 5 minutes. The vehicle is expected to park outside the premises.</p>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <span class="tag orange">OVERRIDE_TIMEOUT logged</span>
+      <span class="tag grey">WF9 → approved: false</span>
+      <span class="tag grey">WF1 ends</span>
+      <span class="tag grey">Vehicle parks outside</span>
+    </div>
+  </div>
+
+  <!-- Path B: Override Requested → Admin Approves -->
+  <div style="border:2px solid #059669; border-radius:10px; overflow:hidden; margin-bottom:14px;">
+    <div style="background:#d1fae5; padding:12px 16px; font-weight:700; font-size:11pt;">Path B — Override requested → Company Admin APPROVES</div>
+    <div style="padding:14px 16px;">
+      <div class="steps">
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:#d1fae5;color:#059669">B1</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-label">Override requested — Admin emailed with Approve/Deny buttons</div>
+            <div class="step-desc">Security clicks "Request Override". WF9 receives <code>overrideRequestSignal</code>. Company Admin receives a formal email with clickable Approve/Deny buttons. Audit log: <code>OVERRIDE_REQUESTED</code>. WF9 waits 5 more minutes for the admin's decision.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:#d1fae5;color:#059669">B2</div><div class="step-line"></div></div>
+          <div class="step-body">
+            <div class="step-label">Admin approves → WF9 returns <code>{ approved: true }</code></div>
+            <div class="step-desc">Admin clicks Approve. <code>adminDecisionSignal</code> with <code>action: 'approve'</code> arrives. LED shows <code>✓ ALLOWED — Welcome, [Name]. Override approved.</code> Emails sent. Audit log: <code>OVERRIDE_APPROVED</code>. Slot count goes above limit (e.g. 11/10).</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left"><div class="step-num" style="background:#d1fae5;color:#059669">B3</div></div>
+          <div class="step-body">
+            <div class="step-label">WF1 resumes with approved=true → starts WF2 + WF7, waits for exit</div>
+            <div class="step-desc">WF1 logs <code>OVERRIDE_ENTRY_STARTED</code>, increments the slot count, starts WF2 (overstay monitor) and WF7 (dashboard update), then waits dormant for the exit signal.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Path C: Override Denied/Timeout -->
+  <div style="border:2px solid #dc2626; border-radius:10px; overflow:hidden;">
+    <div style="background:#fee2e2; padding:12px 16px; font-weight:700; font-size:11pt;">Path C — Override requested → Admin DENIES or times out (5 min)</div>
+    <div style="padding:14px 16px; font-size:10pt; color:#6b7280;">
+      Admin clicks Deny, or does not respond within 5 minutes. LED shows <code>✗ DENIED — Quota override denied.</code> Denial notification emails sent. Audit log: <code>OVERRIDE_DENIED</code>. WF9 returns <code>{ approved: false }</code>. WF1 ends. Vehicle must leave.
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+        <span class="tag red">OVERRIDE_DENIED</span>
+        <span class="tag grey">WF9 → approved: false</span>
+        <span class="tag grey">WF1 ends</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>Cyber Towers — Vehicle Access System</span>
+    <span>Page 6</span>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE 7: CASE 4 — EXIT ═══════════════ -->
+<div class="page">
+  <div class="page-header">
+    <div class="section-num">Section 5 — Case 4</div>
+    <h2>Vehicle Exit</h2>
+    <p>When a vehicle leaves Cyber Towers, their RFID card produces a PortNum=2 scan. This wakes up the dormant WF1 workflow and triggers the full exit sequence.</p>
+  </div>
+
+  <div class="scenario purple">
+    <div class="scenario-header">
+      <div class="scenario-icon">↩️</div>
+      <div>
+        <div class="scenario-title">Exit Detected — Full Cleanup Sequence</div>
+        <div class="scenario-sub">PortNum = 2 · exitSignal sent to dormant WF1 · Slot freed</div>
+      </div>
+    </div>
+    <div class="scenario-body">
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-left">
+            <div class="step-left"><div class="step-num" style="background:#ede9fe;color:#7c3aed">1</div><div class="step-line"></div></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">Exit scan received — backend sends exitSignal to WF1</div>
+            <div class="step-desc">TimeWatch records a PortNum=2 CardRecord. The backend identifies the matching active WF1 instance by cardId and sends the <code>exitSignal</code> via the Temporal client. WF1's dormant <code>wf.condition()</code> wakes up.</div>
+            <div class="step-tech"><span class="tag purple">exitSignal sent</span><span class="tag grey">PortNum=2</span><span class="tag blue">WF1 wakes up</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#ede9fe;color:#7c3aed">2</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">WF1 writes exit audit log</div>
+            <div class="step-desc"><code>db.writeAuditLog({ eventType: 'VEHICLE_EXIT', ... })</code> creates an exit record with the exit timestamp and gate.</div>
+            <div class="step-tech"><span class="tag grey">VEHICLE_EXIT</span><span class="tag grey">writeAuditLog()</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#ede9fe;color:#7c3aed">3</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">Slot count decremented (for authorized vehicles only)</div>
+            <div class="step-desc"><code>db.decrementSlot(pCode)</code> reduces the occupied count by 1 for the company. This frees up a slot for the next vehicle. For unauthorized vehicles that were approved, no slot was ever incremented, so none is decremented.</div>
+            <div class="step-tech"><span class="tag green">decrementSlot()</span><span class="tag grey">Slot freed</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#ede9fe;color:#7c3aed">4</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">cancelOverstaySignal sent to WF2</div>
+            <div class="step-desc">WF1 signals WF2 (the overstay monitor) to cancel. WF2's 24-hour timer is cancelled, and WF2 ends without sending any alert email. This prevents false overstay alerts for vehicles that exited normally.</div>
+            <div class="step-tech"><span class="tag purple">cancelOverstaySignal</span><span class="tag grey">WF2 cancelled</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#ede9fe;color:#7c3aed">5</div>
+            <div class="step-line"></div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">vehicleExitedSignal sent to WF7 → Dashboard updates</div>
+            <div class="step-desc">WF1 signals WF7 with the exit timestamp and gate. WF7 broadcasts the updated occupancy to the frontend dashboard via WebSocket. The Live Entry/Exit table shows the vehicle as "Exited". WF7 ends.</div>
+            <div class="step-tech"><span class="tag purple">vehicleExitedSignal</span><span class="tag blue">WebSocket broadcast</span><span class="tag blue">Dashboard updates</span></div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-left">
+            <div class="step-num" style="background:#ede9fe;color:#7c3aed">6</div>
+          </div>
+          <div class="step-body">
+            <div class="step-label">WF1 workflow instance ends — all cleanup complete</div>
+            <div class="step-desc">WF1 returns. The workflow instance is marked as Completed in Temporal. All associated child workflows (WF2, WF7) have ended. The complete vehicle visit — from entry scan to exit scan — is durably recorded in the audit log.</div>
+            <div class="step-tech"><span class="tag green">WF1 completed</span><span class="tag grey">All workflows ended</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="callout info" style="margin-top:24px">
+    <div class="callout-icon">🕒</div>
+    <div class="callout-body">
+      <div class="callout-title">What happens if WF2's 24-hour timer fires before the exit?</div>
+      <p>If the vehicle is genuinely still inside after 24 hours, WF2 sends an overstay alert email to the company admin and security. WF2 then continues with escalation alerts at 32h and 40h intervals. When the vehicle eventually exits and WF1 sends <code>cancelOverstaySignal</code>, WF2 stops all further alerts.</p>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>Cyber Towers — Vehicle Access System</span>
+    <span>Page 7</span>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE 8: CASE 5 — REPORTS ═══════════════ -->
+<div class="page">
+  <div class="page-header">
+    <div class="section-num">Section 6 — Case 5</div>
+    <h2>Scheduled Reports — Daily & Weekly</h2>
+    <p>Two automated reporting workflows run on a schedule to keep management informed about parking usage and vehicle activity.</p>
+  </div>
+
+  <div class="two-col">
+
+    <div class="scenario blue" style="height:fit-content">
+      <div class="scenario-header">
+        <div class="scenario-icon">📅</div>
+        <div>
+          <div class="scenario-title">WF4 — Daily Report</div>
+          <div class="scenario-sub">Runs every day at midnight</div>
+        </div>
+      </div>
+      <div class="scenario-body">
+        <div class="steps">
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:#dbeafe;color:#1a56db">1</div><div class="step-line"></div></div>
+            <div class="step-body">
+              <div class="step-label">Scheduler triggers WF4</div>
+              <div class="step-desc">Cron job fires at midnight IST. Alternatively, run manually with <code>npx ts-node src/trigger-daily-now.ts</code>.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:#dbeafe;color:#1a56db">2</div><div class="step-line"></div></div>
+            <div class="step-body">
+              <div class="step-label">Collect today's stats from DB</div>
+              <div class="step-desc">Queries CardRecord for today's entries/exits. Breaks down per company. Finds peak hour. Lists vehicles still inside.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:#dbeafe;color:#1a56db">3</div></div>
+            <div class="step-body">
+              <div class="step-label">Email sent to management</div>
+              <div class="step-desc">Sends formatted HTML email with total entries, exits, company breakdown, peak hour, and current occupancy. Audit log: <code>DAILY_REPORT_SENT</code>.</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:8px">
+          <span class="tag blue">WF4</span>
+          <span class="tag grey">Daily</span>
+          <span class="tag grey">DAILY_REPORT_SENT</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="scenario purple" style="height:fit-content">
+      <div class="scenario-header">
+        <div class="scenario-icon">📊</div>
+        <div>
+          <div class="scenario-title">WF5 — Weekly Report</div>
+          <div class="scenario-sub">Runs every Monday morning</div>
+        </div>
+      </div>
+      <div class="scenario-body">
+        <div class="steps">
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:#ede9fe;color:#7c3aed">1</div><div class="step-line"></div></div>
+            <div class="step-body">
+              <div class="step-label">Scheduler triggers WF5</div>
+              <div class="step-desc">Cron fires Monday 6:00 AM IST. Covers the previous Monday–Sunday period.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:#ede9fe;color:#7c3aed">2</div><div class="step-line"></div></div>
+            <div class="step-body">
+              <div class="step-label">Collect 7-day analytics</div>
+              <div class="step-desc">Day-by-day breakdown, company totals, busiest day, peak hour, top 5 most active employees, unauthorized entry count, overnight vehicles.</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-left"><div class="step-num" style="background:#ede9fe;color:#7c3aed">3</div></div>
+            <div class="step-body">
+              <div class="step-label">Rich analytics email sent</div>
+              <div class="step-desc">Comprehensive HTML report with charts-style tables, trends, and current occupancy snapshot. Audit log: <code>WEEKLY_REPORT_SENT</code>.</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:8px">
+          <span class="tag purple">WF5</span>
+          <span class="tag grey">Weekly</span>
+          <span class="tag grey">WEEKLY_REPORT_SENT</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="page-footer">
+    <span>Cyber Towers — Vehicle Access System</span>
+    <span>Page 8</span>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE 9: WORKFLOW REFERENCE ═══════════════ -->
+<div class="page">
+  <div class="page-header">
+    <div class="section-num">Section 7</div>
+    <h2>All Workflows — Quick Reference</h2>
+    <p>A complete summary of all 7 active Temporal workflows, their triggers, and what they do.</p>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:60px">WF ID</th>
+        <th style="width:140px">Name</th>
+        <th>Triggered By</th>
+        <th>What It Does</th>
+        <th style="width:80px">Type</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong style="color:#1a56db">WF1</strong></td>
+        <td><strong>Entry / Exit</strong></td>
+        <td>Every RFID scan (PortNum=1). One instance per vehicle visit.</td>
+        <td>Master workflow. Looks up card, checks quota, shows LED, logs entry, starts WF2/WF7, waits for exit, closes the visit.</td>
+        <td><span class="status-pill pill-blue">Core</span></td>
+      </tr>
+      <tr>
+        <td><strong style="color:#6b21a8">WF2</strong></td>
+        <td><strong>Overstay Alert</strong></td>
+        <td>Started by WF1 after successful entry. One per vehicle inside.</td>
+        <td>Sleeps for 24 hours. If vehicle still inside, sends overstay alert email. Escalates at 32h and 40h. Cancelled by WF1 on exit.</td>
+        <td><span class="status-pill pill-purple">Monitor</span></td>
+      </tr>
+      <tr>
+        <td><strong style="color:#dc2626">WF3</strong></td>
+        <td><strong>Unauthorized Approval</strong></td>
+        <td>WF1 when PCode is empty or '-'.</td>
+        <td>Shows LED alert. Emails security. Waits 10 min for <code>securityDecisionSignal</code>. Returns <code>{ approved: boolean }</code> to WF1.</td>
+        <td><span class="status-pill pill-red">Decision</span></td>
+      </tr>
+      <tr>
+        <td><strong style="color:#0f7140">WF4</strong></td>
+        <td><strong>Daily Report</strong></td>
+        <td>Cron at midnight IST. Or manually via <code>trigger-daily-now.ts</code>.</td>
+        <td>Fetches today's stats. Sends daily email report to management with all entry/exit counts, company breakdown, and occupancy.</td>
+        <td><span class="status-pill pill-green">Report</span></td>
+      </tr>
+      <tr>
+        <td><strong style="color:#0f7140">WF5</strong></td>
+        <td><strong>Weekly Report</strong></td>
+        <td>Cron every Monday 6:00 AM IST.</td>
+        <td>Fetches 7-day analytics. Sends comprehensive weekly report with trends, top cards, busiest day, unauthorized counts.</td>
+        <td><span class="status-pill pill-green">Report</span></td>
+      </tr>
+      <tr>
+        <td><strong style="color:#1a56db">WF7</strong></td>
+        <td><strong>Parking Slot Tracker</strong></td>
+        <td>Started by WF1 after successful entry. Receives <code>vehicleExitedSignal</code>.</td>
+        <td>Broadcasts real-time slot count to dashboard via WebSocket. Updates on entry and exit. Ends when <code>vehicleExitedSignal</code> received.</td>
+        <td><span class="status-pill pill-blue">Broadcast</span></td>
+      </tr>
+      <tr>
+        <td><strong style="color:#d97706">WF9</strong></td>
+        <td><strong>Quota Override</strong></td>
+        <td>WF1 when <code>occupiedSlots ≥ totalSlots</code>.</td>
+        <td>Shows "Parking Full" on LED. Emails admin. Waits 5 min for override request, then 5 min for admin decision. Returns <code>{ approved: boolean }</code>.</td>
+        <td><span class="status-pill pill-orange">Decision</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>executeChild vs startChild — Key Difference</h3>
+
+  <div class="two-col">
+    <div class="info-box" style="border-color:#dc2626">
+      <div class="ib-title" style="color:#dc2626">executeChild — WF1 WAITS</div>
+      <p style="font-size:10pt; color:#6b7280; margin-bottom:8px;">Used for WF3 and WF9. WF1 <strong>stops</strong> and waits for the child to complete and return a result. WF1 needs the decision before it can continue.</p>
+      <ul>
+        <li>WF1 → <code>executeChild(WF3)</code> → WF1 pauses</li>
+        <li>WF3 finishes → returns <code>{ approved: boolean }</code></li>
+        <li>WF1 resumes with the result</li>
+      </ul>
+    </div>
+    <div class="info-box" style="border-color:#059669">
+      <div class="ib-title" style="color:#059669">startChild — WF1 CONTINUES</div>
+      <p style="font-size:10pt; color:#6b7280; margin-bottom:8px;">Used for WF2 and WF7. WF1 launches these in the background and <strong>does not wait</strong>. Both run in parallel with WF1.</p>
+      <ul>
+        <li>WF1 → <code>startChild(WF2)</code> → WF1 continues immediately</li>
+        <li>WF2 runs independently for 24h</li>
+        <li>WF1 doesn't wait — goes to dormant state</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>Cyber Towers — Vehicle Access System</span>
+    <span>Page 9</span>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE 10: SIGNAL COMMUNICATION ═══════════════ -->
+<div class="page">
+  <div class="page-header">
+    <div class="section-num">Section 8</div>
+    <h2>Signal Communication Map</h2>
+    <p>Temporal Signals are messages sent into running workflows from the outside. This is how the dashboard, security guards, and workflows communicate with each other.</p>
+  </div>
+
+  <div class="callout purple">
+    <div class="callout-icon">📡</div>
+    <div class="callout-body">
+      <div class="callout-title">What is a Temporal Signal?</div>
+      <p>Imagine a workflow is sleeping, waiting for something to happen. A Signal is like pressing a button that wakes it up and tells it what happened. Signals are durable — if the server crashes, the signal is not lost. When the server restarts, the workflow receives the signal and continues.</p>
+    </div>
+  </div>
+
+  <h3>All Signals in the System</h3>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Signal Name</th>
+        <th>Sent By</th>
+        <th>Received By</th>
+        <th>Payload</th>
+        <th>What It Does</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code style="color:#7c3aed">exitSignal</code></td>
+        <td>Backend (PortNum=2 scan)</td>
+        <td>WF1</td>
+        <td><code>{ timestamp, gate }</code></td>
+        <td>Wakes up dormant WF1. Triggers exit processing.</td>
+      </tr>
+      <tr>
+        <td><code style="color:#dc2626">securityDecisionSignal</code></td>
+        <td>Dashboard Allow/Deny button → <code>POST /api/security-decision</code></td>
+        <td>WF3</td>
+        <td><code>{ action, officerId, vehicleNumber?, reason? }</code></td>
+        <td>Delivers the security officer's approve or deny decision to WF3.</td>
+      </tr>
+      <tr>
+        <td><code style="color:#d97706">overrideRequestSignal</code></td>
+        <td>Dashboard "Request Override" button</td>
+        <td>WF9</td>
+        <td>None</td>
+        <td>Notifies WF9 that security wants an admin override. Triggers admin email.</td>
+      </tr>
+      <tr>
+        <td><code style="color:#d97706">adminDecisionSignal</code></td>
+        <td>Company Admin email link click</td>
+        <td>WF9</td>
+        <td><code>{ action, adminId, reason? }</code></td>
+        <td>Delivers the admin's approve or deny decision to WF9.</td>
+      </tr>
+      <tr>
+        <td><code style="color:#059669">cancelOverstaySignal</code></td>
+        <td>WF1 (on vehicle exit)</td>
+        <td>WF2</td>
+        <td>None</td>
+        <td>Cancels the 24-hour overstay timer. Prevents false alert emails.</td>
+      </tr>
+      <tr>
+        <td><code style="color:#1a56db">vehicleExitedSignal</code></td>
+        <td>WF1 (on vehicle exit)</td>
+        <td>WF7</td>
+        <td><code>{ timestamp, gate }</code></td>
+        <td>Tells WF7 the vehicle has left. WF7 broadcasts updated slot count and ends.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Signal Flow Diagram</h3>
+
+  <div style="background:#f8fafc; border-radius:12px; padding:20px; margin-top:16px;">
+
+    <div style="font-weight:600; font-size:10pt; color:#6b7280; margin-bottom:12px; text-transform:uppercase; letter-spacing:1px;">Entry Phase</div>
+    <div class="signal-row">
+      <div class="sig-from" style="background:#1e3a5f; color:white;">RFID Reader</div>
+      <div class="sig-arrow">scan event (PortNum=1)</div>
+      <div class="sig-to">Backend → starts WF1</div>
+    </div>
+    <div class="signal-row">
+      <div class="sig-from">Dashboard (Guard)</div>
+      <div class="sig-arrow">securityDecisionSignal</div>
+      <div class="sig-to" style="color:#dc2626">WF3</div>
+    </div>
+    <div class="signal-row">
+      <div class="sig-from">Dashboard (Guard)</div>
+      <div class="sig-arrow">overrideRequestSignal</div>
+      <div class="sig-to" style="color:#d97706">WF9</div>
+    </div>
+    <div class="signal-row">
+      <div class="sig-from">Admin (Email link)</div>
+      <div class="sig-arrow">adminDecisionSignal</div>
+      <div class="sig-to" style="color:#d97706">WF9</div>
+    </div>
+
+    <div style="font-weight:600; font-size:10pt; color:#6b7280; margin:16px 0 12px; text-transform:uppercase; letter-spacing:1px;">Exit Phase</div>
+    <div class="signal-row">
+      <div class="sig-from" style="background:#1e3a5f; color:white;">RFID Reader</div>
+      <div class="sig-arrow">scan event (PortNum=2)</div>
+      <div class="sig-to">Backend → exitSignal to WF1</div>
+    </div>
+    <div class="signal-row">
+      <div class="sig-from" style="color:#7c3aed">WF1</div>
+      <div class="sig-arrow">cancelOverstaySignal</div>
+      <div class="sig-to" style="color:#6b21a8">WF2 (cancelled)</div>
+    </div>
+    <div class="signal-row">
+      <div class="sig-from" style="color:#7c3aed">WF1</div>
+      <div class="sig-arrow">vehicleExitedSignal</div>
+      <div class="sig-to" style="color:#1a56db">WF7 (broadcasts & ends)</div>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>Cyber Towers — Vehicle Access System</span>
+    <span>Page 10</span>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE 11: DATA FLOW ═══════════════ -->
+<div class="page">
+  <div class="page-header">
+    <div class="section-num">Section 9</div>
+    <h2>Data Flow — Dashboard & Reports</h2>
+    <p>The frontend dashboard has two data sources that are merged together to provide a complete picture of vehicle activity.</p>
+  </div>
+
+  <div class="two-col asymmetric">
+    <div>
+      <h3>Two Data Sources</h3>
+
+      <div class="info-box" style="border-color:#1a56db; margin-bottom:14px;">
+        <div class="ib-title" style="color:#1a56db">📀 Source 1: CardRecord Database (SQL)</div>
+        <ul>
+          <li><strong>What it contains:</strong> Real RFID card scans from the TimeWatch system</li>
+          <li><strong>When it's updated:</strong> Immediately when any RFID reader records a scan</li>
+          <li><strong>Used by:</strong> Live Entry/Exit page, Reports page, Stats APIs</li>
+          <li><strong>Table:</strong> <code>CardRecord</code> in MSSQL TimeWatch DB</li>
+          <li><strong>Limitation:</strong> Only has real hardware scans — no simulator events</li>
+        </ul>
+      </div>
+
+      <div class="info-box" style="border-color:#7c3aed;">
+        <div class="ib-title" style="color:#7c3aed">⚡ Source 2: temporalEvents (In-Memory)</div>
+        <ul>
+          <li><strong>What it contains:</strong> Events broadcast by Temporal workflows via WebSocket</li>
+          <li><strong>When it's updated:</strong> Every time a workflow broadcasts ENTRY, EXIT, or DENIED</li>
+          <li><strong>Used by:</strong> Reports page (prepended), Stats APIs (vehicle count)</li>
+          <li><strong>File:</strong> <code>backend/temporalEvents.js</code></li>
+          <li><strong>Limitation:</strong> In-memory only — cleared on server restart</li>
+        </ul>
+      </div>
+    </div>
+
+    <div>
+      <h3>Page Data Sources</h3>
+
+      <div style="border:1px solid #e5e7eb; border-radius:10px; overflow:hidden;">
+        <div style="padding:10px 14px; background:#1e3a5f; color:white; font-weight:600; font-size:10pt;">Which page uses which source?</div>
+        <div style="padding:12px 14px; border-bottom:1px solid #e5e7eb;">
+          <div style="font-weight:600; font-size:10pt; margin-bottom:4px;">Live Entry/Exit</div>
+          <div style="font-size:9.5pt; color:#6b7280;">CardRecord DB only. Real RFID scans. Updated every poll cycle.</div>
+          <span class="tag blue">DB only</span>
+        </div>
+        <div style="padding:12px 14px; border-bottom:1px solid #e5e7eb;">
+          <div style="font-weight:600; font-size:10pt; margin-bottom:4px;">Reports Page</div>
+          <div style="font-size:9.5pt; color:#6b7280; margin-bottom:6px;">Temporal sessions (in-memory) shown first, then DB records. Combined view.</div>
+          <span class="tag purple">Memory + DB</span>
+        </div>
+        <div style="padding:12px 14px; border-bottom:1px solid #e5e7eb;">
+          <div style="font-weight:600; font-size:10pt; margin-bottom:4px;">Dashboard Stats</div>
+          <div style="font-size:9.5pt; color:#6b7280; margin-bottom:6px;">Both sources combined for vehicle counts and entry/exit totals.</div>
+          <span class="tag purple">Memory + DB</span>
+        </div>
+        <div style="padding:12px 14px;">
+          <div style="font-weight:600; font-size:10pt; margin-bottom:4px;">Config Page</div>
+          <div style="font-size:9.5pt; color:#6b7280; margin-bottom:6px;">DB only. Company quotas and RFID card configuration.</div>
+          <span class="tag blue">DB only</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Reports Page — Session Building Logic</h3>
+
+  <div class="callout info">
+    <div class="callout-icon">🔧</div>
+    <div class="callout-body">
+      <div class="callout-title">How temporalEvents.buildSessions() works</div>
+      <p>The in-memory event store pairs ENTRY events with EXIT and DENIED events to build session records that match the shape of CardRecord rows. This allows the Reports page to show Temporal simulator traffic with proper "Exited", "Still Inside", and "Access Denied" statuses.</p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th>Event Sequence</th><th>Resulting Status</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>ENTRY → EXIT</td><td><span class="status-pill pill-green">Exited</span> — Normal completed visit</td></tr>
+      <tr><td>ENTRY (no EXIT yet)</td><td><span class="status-pill pill-blue">Still Inside</span> — Vehicle currently in premises</td></tr>
+      <tr><td>ENTRY → DENIED</td><td><span class="status-pill pill-red">Access Denied</span> — Entry was denied after being held</td></tr>
+      <tr><td>Standalone DENIED</td><td><span class="status-pill pill-red">Access Denied</span> — Denied without prior ENTRY record</td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer">
+    <span>Cyber Towers — Vehicle Access System</span>
+    <span>Page 11</span>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE 12: COMPLETE MASTER FLOW ═══════════════ -->
+<div class="page">
+  <div class="page-header">
+    <div class="section-num">Section 10</div>
+    <h2>Master Flow — All Cases Combined</h2>
+    <p>A single consolidated view of every possible path from RFID scan to workflow completion.</p>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Step</th>
+        <th>Action</th>
+        <th>Workflow</th>
+        <th>Authorized</th>
+        <th>Unauthorized</th>
+        <th>Quota Full</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td>
+        <td>Vehicle scans RFID at gate</td>
+        <td>—</td>
+        <td>✅</td><td>✅</td><td>✅</td>
+      </tr>
+      <tr>
+        <td>2</td>
+        <td>Backend starts WF1</td>
+        <td><strong style="color:#1a56db">WF1</strong></td>
+        <td>✅</td><td>✅</td><td>✅</td>
+      </tr>
+      <tr>
+        <td>3</td>
+        <td>Card lookup (Personnel table)</td>
+        <td>WF1</td>
+        <td>Found, PCode set</td><td>PCode empty/'-'</td><td>Found, PCode set</td>
+      </tr>
+      <tr>
+        <td>4</td>
+        <td>Quota check</td>
+        <td>WF1</td>
+        <td>Slots available</td><td>Skipped (unknown)</td><td>Slots = 0</td>
+      </tr>
+      <tr>
+        <td>5</td>
+        <td>Child workflow triggered</td>
+        <td></td>
+        <td>None — direct allow</td><td><strong style="color:#dc2626">WF3</strong> starts</td><td><strong style="color:#d97706">WF9</strong> starts</td>
+      </tr>
+      <tr>
+        <td>6</td>
+        <td>LED display message</td>
+        <td>WF1/WF3/WF9</td>
+        <td>✓ ALLOWED — Welcome</td><td>UNAUTHORIZED — Wait</td><td>✗ PARKING FULL</td>
+      </tr>
+      <tr>
+        <td>7</td>
+        <td>Human decision</td>
+        <td></td>
+        <td>Automatic</td><td>Security: Allow/Deny</td><td>Security → Admin: Override</td>
+      </tr>
+      <tr>
+        <td>8</td>
+        <td>Signal sent to workflow</td>
+        <td></td>
+        <td>—</td><td><code>securityDecisionSignal</code></td><td><code>overrideRequestSignal</code> + <code>adminDecisionSignal</code></td>
+      </tr>
+      <tr>
+        <td>9</td>
+        <td>Final LED message</td>
+        <td></td>
+        <td>Already shown at step 6</td><td>✓ ALLOWED or ✗ DENIED</td><td>✓ ALLOWED or ✗ DENIED</td>
+      </tr>
+      <tr>
+        <td>10</td>
+        <td>Slot count incremented</td>
+        <td>WF1</td>
+        <td>Yes (+1)</td><td>No (unauthorized, no quota)</td><td>Yes if approved (+1 above limit)</td>
+      </tr>
+      <tr>
+        <td>11</td>
+        <td>Overstay monitor starts</td>
+        <td><strong style="color:#6b21a8">WF2</strong></td>
+        <td>Yes</td><td>Yes (if approved)</td><td>Yes (if approved)</td>
+      </tr>
+      <tr>
+        <td>12</td>
+        <td>Dashboard update</td>
+        <td><strong style="color:#1a56db">WF7</strong></td>
+        <td>Yes</td><td>Yes (if approved)</td><td>Yes (if approved)</td>
+      </tr>
+      <tr>
+        <td>13</td>
+        <td>WF1 waits for exit</td>
+        <td>WF1</td>
+        <td>Yes, dormant</td><td>Yes if approved, else ends</td><td>Yes if approved, else ends</td>
+      </tr>
+      <tr>
+        <td>14</td>
+        <td>Vehicle exit scan</td>
+        <td></td>
+        <td><code>exitSignal</code> sent</td><td><code>exitSignal</code> sent</td><td><code>exitSignal</code> sent</td>
+      </tr>
+      <tr>
+        <td>15</td>
+        <td>Slot decremented, WF2 cancelled, WF7 broadcasts exit</td>
+        <td>WF1</td>
+        <td>Yes</td><td>No slot change</td><td>Yes</td>
+      </tr>
+      <tr>
+        <td>16</td>
+        <td>WF1 ends — visit complete</td>
+        <td>WF1</td>
+        <td>✅</td><td>✅</td><td>✅</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer">
+    <span>Cyber Towers — Vehicle Access System</span>
+    <span>Page 12</span>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE 13: GLOSSARY ═══════════════ -->
+<div class="page">
+  <div class="page-header">
+    <div class="section-num">Appendix</div>
+    <h2>Glossary & Key Terms</h2>
+    <p>Quick reference for all technical terms used in this document.</p>
+  </div>
+
+  <table>
+    <thead>
+      <tr><th style="width:180px">Term</th><th>Meaning</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Temporal</strong></td><td>The workflow engine powering all vehicle access decisions. Ensures workflows survive server restarts, crashes, and network failures.</td></tr>
+      <tr><td><strong>Workflow Instance</strong></td><td>One running copy of a workflow. One WF1 instance is created for each vehicle visit. Multiple instances can run simultaneously.</td></tr>
+      <tr><td><strong>Signal</strong></td><td>A message sent into a running workflow to wake it up and provide data (e.g., security decision, exit notification).</td></tr>
+      <tr><td><strong>Activity</strong></td><td>A single unit of work inside a workflow — e.g., looking up a card in the database, sending an email, updating the LED.</td></tr>
+      <tr><td><strong>CardID</strong></td><td>The RFID card number embedded in the physical card carried by employees/visitors.</td></tr>
+      <tr><td><strong>PCode</strong></td><td>Company code. Identifies which company the cardholder belongs to. Empty/'-' means unauthorized.</td></tr>
+      <tr><td><strong>PortNum</strong></td><td>1 = Entry scan, 2 = Exit scan. Determined by which reader captured the scan.</td></tr>
+      <tr><td><strong>LED Panel</strong></td><td>The display board at each gate. Shows ALLOWED or DENIED messages. There is no automated barrier at Cyber Towers.</td></tr>
+      <tr><td><strong>temporalEvents</strong></td><td>In-memory event store in the backend. Stores Temporal workflow events so they appear in the Reports and Stats pages.</td></tr>
+      <tr><td><strong>executeChild</strong></td><td>Starts a child workflow and WAITS for it to finish. WF1 uses this for WF3 and WF9 so it can act on their decision.</td></tr>
+      <tr><td><strong>startChild</strong></td><td>Starts a child workflow and DOES NOT wait. WF1 uses this for WF2 and WF7 which run in the background.</td></tr>
+      <tr><td><strong>wf.condition()</strong></td><td>A durable wait inside a workflow. The workflow sleeps until a condition becomes true or a timeout occurs.</td></tr>
+      <tr><td><strong>Quota</strong></td><td>The number of parking slots allocated to a company. e.g., Microsoft India has 22 total slots.</td></tr>
+      <tr><td><strong>Override</strong></td><td>Allowing a vehicle to enter even though the company's quota is full. Requires admin approval.</td></tr>
+      <tr><td><strong>Audit Log</strong></td><td>A permanent database record of every significant event: entry, exit, approval, denial, report sent, etc.</td></tr>
+      <tr><td><strong>WebSocket</strong></td><td>A real-time connection between backend and frontend. Used to push live updates to the dashboard without page refresh.</td></tr>
+      <tr><td><strong>Task Queue</strong></td><td>The Temporal queue name: <code>cyber-towers-task-queue</code>. All workflows and activities use this queue.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout success" style="margin-top:24px">
+    <div class="callout-icon">✅</div>
+    <div class="callout-body">
+      <div class="callout-title">System Status</div>
+      <p>All 7 workflows are active and tested. 6/6 end-to-end tests passing. All code committed to <strong>jayanth-bluesprings/cyber_towers_web</strong>. All GitHub issues closed under the correct account.</p>
+    </div>
+  </div>
+
+  <div class="page-footer">
+    <span>Cyber Towers — Vehicle Access System</span>
+    <span>Page 13 — End of Document</span>
+  </div>
+</div>
+
+</body>
+</html>

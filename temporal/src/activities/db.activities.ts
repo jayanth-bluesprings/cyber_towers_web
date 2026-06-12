@@ -66,6 +66,9 @@ export async function lookupPersonnel(
   cardId: string                // the RFID card number from the gate scan
 ): Promise<PersonnelRecord | null> {
 
+  // CardData column is bigint — non-numeric IDs will never exist in the DB
+  if (!/^\d+$/.test(cardId)) return null;
+
   const pool    = await getPool();
   const request = pool.request();
 

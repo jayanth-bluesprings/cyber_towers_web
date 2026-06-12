@@ -1,0 +1,466 @@
+- generic [ref=e25]:
+  - navigation [ref=e26]:
+    - generic [ref=e27]:
+      - generic [ref=e28]:
+        - img "Logo" [ref=e30]
+        - generic [ref=e31]:
+          - heading "Vehicle Access Management" [level=1] [ref=e32]
+          - paragraph [ref=e33]: Security Dashboard
+      - generic [ref=e34]:
+        - button "Dashboard" [ref=e35] [cursor=pointer]:
+          - img [ref=e36]
+          - text: Dashboard
+        - button "Live Entry/Exit" [ref=e38] [cursor=pointer]:
+          - img [ref=e39]
+          - text: Live Entry/Exit
+        - button "Reports" [ref=e41] [cursor=pointer]:
+          - img [ref=e42]
+          - text: Reports
+        - button "Configuration" [ref=e44] [cursor=pointer]:
+          - img [ref=e45]
+          - text: Configuration
+      - generic [ref=e47]:
+        - generic [ref=e49]:
+          - generic [ref=e50]: CyberTowers, Hyderabad
+          - generic [ref=e51]: Wed, 10 Jun · 05:50:54 pm IST
+        - button "Toggle dark mode" [ref=e52] [cursor=pointer]:
+          - img [ref=e53]
+        - button "Logout" [ref=e55] [cursor=pointer]:
+          - img [ref=e56]
+          - text: Logout
+  - main [ref=e58]:
+    - generic [ref=e59]:
+      - generic [ref=e60]:
+        - heading "Access Overview" [level=2] [ref=e61]
+        - paragraph [ref=e62]: Real-time vehicle access monitoring ·
+      - generic [ref=e63]:
+        - button "Restricted" [ref=e64]:
+          - img [ref=e65]
+          - text: Restricted
+        - button "24h+ Alert / Download" [ref=e67] [cursor=pointer]:
+          - img [ref=e68]
+          - text: 24h+ Alert / Download
+        - button "Health Check" [ref=e71] [cursor=pointer]:
+          - img [ref=e72]
+          - text: Health Check
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - paragraph [ref=e76]: Stats for
+        - generic [ref=e77]:
+          - button "Day" [ref=e78] [cursor=pointer]
+          - button "Week" [ref=e79] [cursor=pointer]
+          - button "Month" [ref=e80] [cursor=pointer]
+      - generic [ref=e81]:
+        - button "Vehicles 0 visited today Inside 0 Exited 0" [disabled] [ref=e82]:
+          - generic [ref=e83]:
+            - generic [ref=e84]:
+              - paragraph [ref=e85]: Vehicles
+              - paragraph [ref=e86]: "0"
+              - paragraph [ref=e87]: visited today
+              - generic [ref=e88]:
+                - generic [ref=e89]:
+                  - text: Inside
+                  - generic [ref=e90]: "0"
+                - generic [ref=e91]:
+                  - text: Exited
+                  - generic [ref=e92]: "0"
+            - img [ref=e94]
+        - generic [ref=e96]:
+          - generic [ref=e97]:
+            - paragraph [ref=e98]: Entry
+            - paragraph [ref=e99]: "0"
+            - paragraph [ref=e100]: in today
+          - generic [ref=e102]:
+            - paragraph [ref=e103]: Exit
+            - paragraph [ref=e104]: "0"
+            - paragraph [ref=e105]: out today
+        - button "2-Wheelers 0 today Inside 0 Exited 0" [disabled] [ref=e106]:
+          - generic [ref=e107]:
+            - generic [ref=e108]:
+              - paragraph [ref=e109]: 2-Wheelers
+              - paragraph [ref=e110]: "0"
+              - paragraph [ref=e111]: today
+              - generic [ref=e112]:
+                - generic [ref=e113]:
+                  - text: Inside
+                  - generic [ref=e114]: "0"
+                - generic [ref=e115]:
+                  - text: Exited
+                  - generic [ref=e116]: "0"
+            - img [ref=e118]
+        - button "4-Wheelers 0 today Inside 0 Exited 0" [disabled] [ref=e120]:
+          - generic [ref=e121]:
+            - generic [ref=e122]:
+              - paragraph [ref=e123]: 4-Wheelers
+              - paragraph [ref=e124]: "0"
+              - paragraph [ref=e125]: today
+              - generic [ref=e126]:
+                - generic [ref=e127]:
+                  - text: Inside
+                  - generic [ref=e128]: "0"
+                - generic [ref=e129]:
+                  - text: Exited
+                  - generic [ref=e130]: "0"
+            - img [ref=e132]
+        - button "Overstay 0 vehicles beyond 24h" [ref=e135] [cursor=pointer]:
+          - generic [ref=e136]:
+            - generic [ref=e137]:
+              - paragraph [ref=e138]: Overstay
+              - paragraph [ref=e139]: "0"
+              - paragraph [ref=e140]: vehicles beyond 24h
+            - img [ref=e142]
+    - generic [ref=e145]:
+      - generic [ref=e146]:
+        - generic [ref=e147]:
+          - heading "Movement Graph" [level=3] [ref=e148]
+          - paragraph [ref=e149]: Today by hour, all entry and exit scans
+        - generic [ref=e150]:
+          - button "Entry" [ref=e151] [cursor=pointer]
+          - button "Exit" [ref=e152] [cursor=pointer]
+          - button "2W" [ref=e153] [cursor=pointer]
+          - button "4W" [ref=e154] [cursor=pointer]
+      - img [ref=e156]
+    - generic [ref=e157]:
+      - generic [ref=e158]:
+        - generic [ref=e160]:
+          - heading "Live Entry / Exit LIVE" [level=3] [ref=e161]:
+            - text: Live Entry / Exit
+            - generic [ref=e162]: LIVE
+          - paragraph [ref=e164]:
+            - text: Showing 20 of 1285 unique scans
+            - generic [ref=e165]: ( 20 per page)
+          - generic [ref=e166]:
+            - button "All Gates" [ref=e167] [cursor=pointer]
+            - button "Gate 1" [ref=e168] [cursor=pointer]
+            - button "Gate 2" [ref=e169] [cursor=pointer]
+        - generic [ref=e170]:
+          - generic [ref=e171]:
+            - img [ref=e172]
+            - textbox "Card ID, name, flat..." [ref=e174]
+          - button "CSV" [ref=e175] [cursor=pointer]:
+            - img [ref=e176]
+            - text: CSV
+      - table [ref=e179]:
+        - rowgroup [ref=e180]:
+          - row "Gate Card ID Vehicle Type Company Name Car No. Parking Slot Authorization Action Scan Time" [ref=e181]:
+            - columnheader "Gate" [ref=e182]
+            - columnheader "Card ID" [ref=e183]
+            - columnheader "Vehicle Type" [ref=e184]
+            - columnheader "Company Name" [ref=e185]
+            - columnheader "Car No." [ref=e186]
+            - columnheader "Parking Slot" [ref=e187]
+            - columnheader "Authorization" [ref=e188]
+            - columnheader "Action" [ref=e189]
+            - columnheader "Scan Time" [ref=e190]
+        - rowgroup [ref=e191]:
+          - row "↑ Gate 1 5248273 2W A-204 Jayanth No Slot Authorized - 27 Apr 2026, 21:29:23" [ref=e192]:
+            - cell "↑ Gate 1" [ref=e193]:
+              - generic [ref=e194]:
+                - generic [ref=e195]: ↑
+                - text: Gate 1
+            - cell "5248273" [ref=e196]
+            - cell "2W" [ref=e197]:
+              - generic [ref=e198]: 2W
+            - cell "A-204" [ref=e199]
+            - cell "Jayanth" [ref=e200]
+            - cell "No Slot" [ref=e201]
+            - cell "Authorized" [ref=e202]:
+              - generic [ref=e204]: Authorized
+            - cell "-" [ref=e205]
+            - cell "27 Apr 2026, 21:29:23" [ref=e206]
+          - row "↑ Gate 1 5248273 2W A-204 Jayanth No Slot Authorized - 27 Apr 2026, 21:28:43" [ref=e207]:
+            - cell "↑ Gate 1" [ref=e208]:
+              - generic [ref=e209]:
+                - generic [ref=e210]: ↑
+                - text: Gate 1
+            - cell "5248273" [ref=e211]
+            - cell "2W" [ref=e212]:
+              - generic [ref=e213]: 2W
+            - cell "A-204" [ref=e214]
+            - cell "Jayanth" [ref=e215]
+            - cell "No Slot" [ref=e216]
+            - cell "Authorized" [ref=e217]:
+              - generic [ref=e219]: Authorized
+            - cell "-" [ref=e220]
+            - cell "27 Apr 2026, 21:28:43" [ref=e221]
+          - row "↑ Gate 1 5248273 2W A-204 Jayanth No Slot Authorized - 27 Apr 2026, 21:18:13" [ref=e222]:
+            - cell "↑ Gate 1" [ref=e223]:
+              - generic [ref=e224]:
+                - generic [ref=e225]: ↑
+                - text: Gate 1
+            - cell "5248273" [ref=e226]
+            - cell "2W" [ref=e227]:
+              - generic [ref=e228]: 2W
+            - cell "A-204" [ref=e229]
+            - cell "Jayanth" [ref=e230]
+            - cell "No Slot" [ref=e231]
+            - cell "Authorized" [ref=e232]:
+              - generic [ref=e234]: Authorized
+            - cell "-" [ref=e235]
+            - cell "27 Apr 2026, 21:18:13" [ref=e236]
+          - row "↑ Gate 1 5248273 2W A-204 Jayanth No Slot Authorized - 25 Apr 2026, 13:41:20" [ref=e237]:
+            - cell "↑ Gate 1" [ref=e238]:
+              - generic [ref=e239]:
+                - generic [ref=e240]: ↑
+                - text: Gate 1
+            - cell "5248273" [ref=e241]
+            - cell "2W" [ref=e242]:
+              - generic [ref=e243]: 2W
+            - cell "A-204" [ref=e244]
+            - cell "Jayanth" [ref=e245]
+            - cell "No Slot" [ref=e246]
+            - cell "Authorized" [ref=e247]:
+              - generic [ref=e249]: Authorized
+            - cell "-" [ref=e250]
+            - cell "25 Apr 2026, 13:41:20" [ref=e251]
+          - row "↑ Gate 1 5248273 2W A-204 Jayanth No Slot Authorized - 25 Apr 2026, 13:40:30" [ref=e252]:
+            - cell "↑ Gate 1" [ref=e253]:
+              - generic [ref=e254]:
+                - generic [ref=e255]: ↑
+                - text: Gate 1
+            - cell "5248273" [ref=e256]
+            - cell "2W" [ref=e257]:
+              - generic [ref=e258]: 2W
+            - cell "A-204" [ref=e259]
+            - cell "Jayanth" [ref=e260]
+            - cell "No Slot" [ref=e261]
+            - cell "Authorized" [ref=e262]:
+              - generic [ref=e264]: Authorized
+            - cell "-" [ref=e265]
+            - cell "25 Apr 2026, 13:40:30" [ref=e266]
+          - row "↑ Gate 1 5248273 2W A-204 Jayanth No Slot Authorized - 25 Apr 2026, 12:30:41" [ref=e267]:
+            - cell "↑ Gate 1" [ref=e268]:
+              - generic [ref=e269]:
+                - generic [ref=e270]: ↑
+                - text: Gate 1
+            - cell "5248273" [ref=e271]
+            - cell "2W" [ref=e272]:
+              - generic [ref=e273]: 2W
+            - cell "A-204" [ref=e274]
+            - cell "Jayanth" [ref=e275]
+            - cell "No Slot" [ref=e276]
+            - cell "Authorized" [ref=e277]:
+              - generic [ref=e279]: Authorized
+            - cell "-" [ref=e280]
+            - cell "25 Apr 2026, 12:30:41" [ref=e281]
+          - row "↑ Gate 1 5248274 - Pavan Kumar No Slot Authorized - 14 Apr 2026, 14:35:20" [ref=e282]:
+            - cell "↑ Gate 1" [ref=e283]:
+              - generic [ref=e284]:
+                - generic [ref=e285]: ↑
+                - text: Gate 1
+            - cell "5248274" [ref=e286]
+            - cell "-" [ref=e287]:
+              - generic [ref=e288]: "-"
+            - cell [ref=e289]
+            - cell "Pavan Kumar" [ref=e290]
+            - cell "No Slot" [ref=e291]
+            - cell "Authorized" [ref=e292]:
+              - generic [ref=e294]: Authorized
+            - cell "-" [ref=e295]
+            - cell "14 Apr 2026, 14:35:20" [ref=e296]
+          - row "↑ Gate 1 5248274 - Pavan Kumar No Slot Authorized - 14 Apr 2026, 14:34:53" [ref=e297]:
+            - cell "↑ Gate 1" [ref=e298]:
+              - generic [ref=e299]:
+                - generic [ref=e300]: ↑
+                - text: Gate 1
+            - cell "5248274" [ref=e301]
+            - cell "-" [ref=e302]:
+              - generic [ref=e303]: "-"
+            - cell [ref=e304]
+            - cell "Pavan Kumar" [ref=e305]
+            - cell "No Slot" [ref=e306]
+            - cell "Authorized" [ref=e307]:
+              - generic [ref=e309]: Authorized
+            - cell "-" [ref=e310]
+            - cell "14 Apr 2026, 14:34:53" [ref=e311]
+          - row "↑ Gate 1 5248533 - - - No Slot Unauthorized Allow 14 Apr 2026, 14:34:49" [ref=e312]:
+            - cell "↑ Gate 1" [ref=e313]:
+              - generic [ref=e314]:
+                - generic [ref=e315]: ↑
+                - text: Gate 1
+            - cell "5248533" [ref=e316]
+            - cell "-" [ref=e317]:
+              - generic [ref=e318]: "-"
+            - cell "-" [ref=e319]
+            - cell "-" [ref=e320]
+            - cell "No Slot" [ref=e321]
+            - cell "Unauthorized" [ref=e322]:
+              - generic [ref=e324]: Unauthorized
+            - cell "Allow" [ref=e325]:
+              - button "Allow" [ref=e326] [cursor=pointer]
+            - cell "14 Apr 2026, 14:34:49" [ref=e327]
+          - row "↑ Gate 1 5248274 - Pavan Kumar No Slot Authorized - 14 Apr 2026, 14:33:27" [ref=e328]:
+            - cell "↑ Gate 1" [ref=e329]:
+              - generic [ref=e330]:
+                - generic [ref=e331]: ↑
+                - text: Gate 1
+            - cell "5248274" [ref=e332]
+            - cell "-" [ref=e333]:
+              - generic [ref=e334]: "-"
+            - cell [ref=e335]
+            - cell "Pavan Kumar" [ref=e336]
+            - cell "No Slot" [ref=e337]
+            - cell "Authorized" [ref=e338]:
+              - generic [ref=e340]: Authorized
+            - cell "-" [ref=e341]
+            - cell "14 Apr 2026, 14:33:27" [ref=e342]
+          - row "↑ Gate 1 5248533 - - - No Slot Unauthorized Allow 14 Apr 2026, 14:29:10" [ref=e343]:
+            - cell "↑ Gate 1" [ref=e344]:
+              - generic [ref=e345]:
+                - generic [ref=e346]: ↑
+                - text: Gate 1
+            - cell "5248533" [ref=e347]
+            - cell "-" [ref=e348]:
+              - generic [ref=e349]: "-"
+            - cell "-" [ref=e350]
+            - cell "-" [ref=e351]
+            - cell "No Slot" [ref=e352]
+            - cell "Unauthorized" [ref=e353]:
+              - generic [ref=e355]: Unauthorized
+            - cell "Allow" [ref=e356]:
+              - button "Allow" [ref=e357] [cursor=pointer]
+            - cell "14 Apr 2026, 14:29:10" [ref=e358]
+          - row "↑ Gate 1 5248273 2W A-204 Jayanth No Slot Authorized - 14 Apr 2026, 14:28:44" [ref=e359]:
+            - cell "↑ Gate 1" [ref=e360]:
+              - generic [ref=e361]:
+                - generic [ref=e362]: ↑
+                - text: Gate 1
+            - cell "5248273" [ref=e363]
+            - cell "2W" [ref=e364]:
+              - generic [ref=e365]: 2W
+            - cell "A-204" [ref=e366]
+            - cell "Jayanth" [ref=e367]
+            - cell "No Slot" [ref=e368]
+            - cell "Authorized" [ref=e369]:
+              - generic [ref=e371]: Authorized
+            - cell "-" [ref=e372]
+            - cell "14 Apr 2026, 14:28:44" [ref=e373]
+          - row "↑ Gate 1 5248273 2W A-204 Jayanth No Slot Authorized - 14 Apr 2026, 14:27:59" [ref=e374]:
+            - cell "↑ Gate 1" [ref=e375]:
+              - generic [ref=e376]:
+                - generic [ref=e377]: ↑
+                - text: Gate 1
+            - cell "5248273" [ref=e378]
+            - cell "2W" [ref=e379]:
+              - generic [ref=e380]: 2W
+            - cell "A-204" [ref=e381]
+            - cell "Jayanth" [ref=e382]
+            - cell "No Slot" [ref=e383]
+            - cell "Authorized" [ref=e384]:
+              - generic [ref=e386]: Authorized
+            - cell "-" [ref=e387]
+            - cell "14 Apr 2026, 14:27:59" [ref=e388]
+          - row "↑ Gate 1 5248533 - - - No Slot Unauthorized Allow 14 Apr 2026, 14:26:15" [ref=e389]:
+            - cell "↑ Gate 1" [ref=e390]:
+              - generic [ref=e391]:
+                - generic [ref=e392]: ↑
+                - text: Gate 1
+            - cell "5248533" [ref=e393]
+            - cell "-" [ref=e394]:
+              - generic [ref=e395]: "-"
+            - cell "-" [ref=e396]
+            - cell "-" [ref=e397]
+            - cell "No Slot" [ref=e398]
+            - cell "Unauthorized" [ref=e399]:
+              - generic [ref=e401]: Unauthorized
+            - cell "Allow" [ref=e402]:
+              - button "Allow" [ref=e403] [cursor=pointer]
+            - cell "14 Apr 2026, 14:26:15" [ref=e404]
+          - row "↑ Gate 1 5248533 - - - No Slot Unauthorized Allow 14 Apr 2026, 14:25:18" [ref=e405]:
+            - cell "↑ Gate 1" [ref=e406]:
+              - generic [ref=e407]:
+                - generic [ref=e408]: ↑
+                - text: Gate 1
+            - cell "5248533" [ref=e409]
+            - cell "-" [ref=e410]:
+              - generic [ref=e411]: "-"
+            - cell "-" [ref=e412]
+            - cell "-" [ref=e413]
+            - cell "No Slot" [ref=e414]
+            - cell "Unauthorized" [ref=e415]:
+              - generic [ref=e417]: Unauthorized
+            - cell "Allow" [ref=e418]:
+              - button "Allow" [ref=e419] [cursor=pointer]
+            - cell "14 Apr 2026, 14:25:18" [ref=e420]
+          - row "↑ Gate 1 5248274 - Pavan Kumar No Slot Authorized - 14 Apr 2026, 14:18:53" [ref=e421]:
+            - cell "↑ Gate 1" [ref=e422]:
+              - generic [ref=e423]:
+                - generic [ref=e424]: ↑
+                - text: Gate 1
+            - cell "5248274" [ref=e425]
+            - cell "-" [ref=e426]:
+              - generic [ref=e427]: "-"
+            - cell [ref=e428]
+            - cell "Pavan Kumar" [ref=e429]
+            - cell "No Slot" [ref=e430]
+            - cell "Authorized" [ref=e431]:
+              - generic [ref=e433]: Authorized
+            - cell "-" [ref=e434]
+            - cell "14 Apr 2026, 14:18:53" [ref=e435]
+          - row "↑ Gate 1 5248274 - Pavan Kumar No Slot Authorized - 14 Apr 2026, 14:12:34" [ref=e436]:
+            - cell "↑ Gate 1" [ref=e437]:
+              - generic [ref=e438]:
+                - generic [ref=e439]: ↑
+                - text: Gate 1
+            - cell "5248274" [ref=e440]
+            - cell "-" [ref=e441]:
+              - generic [ref=e442]: "-"
+            - cell [ref=e443]
+            - cell "Pavan Kumar" [ref=e444]
+            - cell "No Slot" [ref=e445]
+            - cell "Authorized" [ref=e446]:
+              - generic [ref=e448]: Authorized
+            - cell "-" [ref=e449]
+            - cell "14 Apr 2026, 14:12:34" [ref=e450]
+          - row "↓ Gate 1 65535 - - - No Slot Unauthorized - 02 Apr 2026, 18:37:03" [ref=e451]:
+            - cell "↓ Gate 1" [ref=e452]:
+              - generic [ref=e453]:
+                - generic [ref=e454]: ↓
+                - text: Gate 1
+            - cell "65535" [ref=e455]
+            - cell "-" [ref=e456]:
+              - generic [ref=e457]: "-"
+            - cell "-" [ref=e458]
+            - cell "-" [ref=e459]
+            - cell "No Slot" [ref=e460]
+            - cell "Unauthorized" [ref=e461]:
+              - generic [ref=e463]: Unauthorized
+            - cell "-" [ref=e464]
+            - cell "02 Apr 2026, 18:37:03" [ref=e465]
+          - row "↓ Gate 1 32767 - - - No Slot Unauthorized - 02 Apr 2026, 18:37:00" [ref=e466]:
+            - cell "↓ Gate 1" [ref=e467]:
+              - generic [ref=e468]:
+                - generic [ref=e469]: ↓
+                - text: Gate 1
+            - cell "32767" [ref=e470]
+            - cell "-" [ref=e471]:
+              - generic [ref=e472]: "-"
+            - cell "-" [ref=e473]
+            - cell "-" [ref=e474]
+            - cell "No Slot" [ref=e475]
+            - cell "Unauthorized" [ref=e476]:
+              - generic [ref=e478]: Unauthorized
+            - cell "-" [ref=e479]
+            - cell "02 Apr 2026, 18:37:00" [ref=e480]
+          - row "↓ Gate 1 8388607 - - - No Slot Unauthorized - 02 Apr 2026, 18:29:08" [ref=e481]:
+            - cell "↓ Gate 1" [ref=e482]:
+              - generic [ref=e483]:
+                - generic [ref=e484]: ↓
+                - text: Gate 1
+            - cell "8388607" [ref=e485]
+            - cell "-" [ref=e486]:
+              - generic [ref=e487]: "-"
+            - cell "-" [ref=e488]
+            - cell "-" [ref=e489]
+            - cell "No Slot" [ref=e490]
+            - cell "Unauthorized" [ref=e491]:
+              - generic [ref=e493]: Unauthorized
+            - cell "-" [ref=e494]
+            - cell "02 Apr 2026, 18:29:08" [ref=e495]
+      - generic [ref=e496]:
+        - generic [ref=e497]: Page 1 of 65
+        - generic [ref=e498]:
+          - button "Previous" [disabled] [ref=e499]
+          - button "Next" [ref=e500] [cursor=pointer]
+  - contentinfo [ref=e501]:
+    - generic [ref=e503]: Vehicle Access Dashboard v1.0

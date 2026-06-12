@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Temporal Workflows — Vehicle Access Dashboard (Cyber Towers)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Calibri', 'Segoe UI', Arial, sans-serif; font-size: 11pt; color: #1a1a2e; background: #fff; line-height: 1.6; }
+  .page { max-width: 900px; margin: 0 auto; padding: 40px 50px; }
+
+  /* Cover */
+  .cover { text-align: center; padding: 80px 0 60px; border-bottom: 3px solid #0284c7; margin-bottom: 40px; }
+  .cover .logo { font-size: 13pt; font-weight: 700; color: #0284c7; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+  .cover h1 { font-size: 26pt; font-weight: 800; color: #0f172a; line-height: 1.2; margin-bottom: 12px; }
+  .cover .subtitle { font-size: 14pt; color: #475569; margin-bottom: 30px; }
+  .cover .meta { font-size: 10pt; color: #94a3b8; }
+  .cover .status-badge { display: inline-block; background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; padding: 6px 16px; border-radius: 20px; font-size: 10pt; font-weight: 700; margin-top: 10px; }
+
+  /* TOC */
+  .toc { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px 28px; margin-bottom: 40px; }
+  .toc h2 { font-size: 12pt; font-weight: 700; color: #0f172a; margin-bottom: 14px; text-transform: uppercase; letter-spacing: 1px; }
+  .toc ol { padding-left: 20px; }
+  .toc li { margin-bottom: 6px; font-size: 10.5pt; color: #334155; }
+  .toc a { color: #0284c7; text-decoration: none; }
+
+  /* Section headers */
+  h1.section { font-size: 18pt; font-weight: 800; color: #0284c7; margin: 48px 0 16px; padding-bottom: 8px; border-bottom: 2px solid #e0f2fe; }
+  h2.workflow-title { font-size: 16pt; font-weight: 800; color: #0f172a; margin: 40px 0 6px; }
+  h3 { font-size: 12pt; font-weight: 700; color: #0f172a; margin: 20px 0 8px; }
+  h4 { font-size: 11pt; font-weight: 700; color: #334155; margin: 14px 0 6px; }
+
+  /* Workflow header band */
+  .workflow-band { background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: white; border-radius: 10px; padding: 20px 24px; margin-bottom: 24px; }
+  .workflow-band .wf-number { font-size: 10pt; font-weight: 700; letter-spacing: 2px; opacity: 0.8; text-transform: uppercase; }
+  .workflow-band .wf-name { font-size: 18pt; font-weight: 800; margin: 4px 0; }
+  .workflow-band .wf-tagline { font-size: 11pt; opacity: 0.9; }
+
+  /* Purpose boxes */
+  .purpose-box { background: #f0f9ff; border-left: 4px solid #0284c7; border-radius: 0 8px 8px 0; padding: 14px 18px; margin-bottom: 18px; }
+  .purpose-box p { font-size: 11pt; color: #1e3a5f; line-height: 1.7; }
+
+  /* Problem boxes */
+  .problem-box { background: #fff7ed; border-left: 4px solid #f97316; border-radius: 0 8px 8px 0; padding: 14px 18px; margin-bottom: 18px; }
+  .problem-box .label { font-size: 9pt; font-weight: 700; color: #c2410c; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .problem-box p { font-size: 11pt; color: #431407; line-height: 1.7; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 14px 0 22px; font-size: 10.5pt; }
+  th { background: #1e3a5f; color: white; padding: 10px 14px; text-align: left; font-weight: 700; font-size: 10pt; }
+  td { padding: 9px 14px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  tr:hover td { background: #f0f9ff; }
+
+  /* Code blocks */
+  pre { background: #1e293b; color: #e2e8f0; padding: 18px 20px; border-radius: 8px; font-family: 'Consolas', 'Courier New', monospace; font-size: 9.5pt; overflow-x: auto; margin: 12px 0 20px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; }
+  code { background: #f1f5f9; color: #dc2626; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', 'Courier New', monospace; font-size: 10pt; }
+
+  /* Steps */
+  .steps { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 22px; margin: 14px 0 20px; }
+  .step { display: flex; gap: 14px; margin-bottom: 18px; align-items: flex-start; }
+  .step:last-child { margin-bottom: 0; }
+  .step-num { background: #0284c7; color: white; min-width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: 800; flex-shrink: 0; margin-top: 2px; }
+  .step-body { flex: 1; }
+  .step-body strong { font-size: 11pt; color: #0f172a; display: block; margin-bottom: 4px; }
+  .step-body p { font-size: 10.5pt; color: #475569; margin: 2px 0; }
+  .step-body .activity-tag { display: inline-block; background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-size: 9pt; font-weight: 700; margin-right: 6px; }
+  .step-body .timer-tag { display: inline-block; background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 9pt; font-weight: 700; margin-right: 6px; }
+  .step-body .signal-tag { display: inline-block; background: #ede9fe; color: #5b21b6; padding: 2px 8px; border-radius: 4px; font-size: 9pt; font-weight: 700; margin-right: 6px; }
+  .step-body .wait-tag { display: inline-block; background: #fce7f3; color: #9d174d; padding: 2px 8px; border-radius: 4px; font-size: 9pt; font-weight: 700; margin-right: 6px; }
+
+  /* Comparison cards */
+  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 14px 0 20px; }
+  .comp-card { border-radius: 8px; padding: 16px; }
+  .comp-card.before { background: #fef2f2; border: 1px solid #fecaca; }
+  .comp-card.after { background: #f0fdf4; border: 1px solid #bbf7d0; }
+  .comp-card .comp-label { font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .comp-card.before .comp-label { color: #dc2626; }
+  .comp-card.after .comp-label { color: #16a34a; }
+  .comp-card ul { padding-left: 16px; font-size: 10.5pt; }
+  .comp-card li { margin-bottom: 5px; color: #374151; }
+
+  /* Info row */
+  .info-row { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0; }
+  .info-pill { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 20px; padding: 5px 14px; font-size: 10pt; color: #334155; }
+  .info-pill strong { color: #0f172a; }
+
+  /* Priority table special styling */
+  .priority-1 td:first-child { border-left: 4px solid #dc2626; }
+  .priority-2 td:first-child { border-left: 4px solid #ea580c; }
+  .priority-3 td:first-child { border-left: 4px solid #ca8a04; }
+  .priority-4 td:first-child { border-left: 4px solid #16a34a; }
+  .priority-5 td:first-child { border-left: 4px solid #0284c7; }
+
+  /* Diagram */
+  .diagram { background: #1e293b; color: #94a3b8; font-family: 'Consolas', monospace; font-size: 9.5pt; padding: 24px; border-radius: 8px; margin: 14px 0 20px; line-height: 1.8; white-space: pre; }
+
+  /* Alert timeline */
+  .alert-timeline { display: flex; gap: 0; margin: 14px 0 20px; }
+  .timeline-item { flex: 1; text-align: center; padding: 12px 8px; border: 1px solid #e2e8f0; }
+  .timeline-item:first-child { border-radius: 8px 0 0 8px; }
+  .timeline-item:last-child { border-radius: 0 8px 8px 0; }
+  .timeline-item.t1 { background: #fff7ed; border-color: #fed7aa; }
+  .timeline-item.t2 { background: #fef2f2; border-color: #fecaca; }
+  .timeline-item.t3 { background: #fef2f2; border-color: #f87171; }
+  .timeline-item.t4 { background: #450a0a; color: white; border-color: #7f1d1d; }
+  .timeline-item .time { font-size: 14pt; font-weight: 800; }
+  .timeline-item .label { font-size: 9pt; font-weight: 600; margin-top: 4px; }
+  .t1 .time { color: #c2410c; }
+  .t2 .time { color: #dc2626; }
+  .t3 .time { color: #b91c1c; }
+  .t4 .time { color: white; }
+
+  /* Summary footer */
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }
+  .summary-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; text-align: center; }
+  .summary-card .num { font-size: 22pt; font-weight: 800; color: #0284c7; }
+  .summary-card .lbl { font-size: 9pt; color: #64748b; font-weight: 600; margin-top: 4px; }
+
+  /* Divider */
+  .divider { border: none; border-top: 2px solid #e2e8f0; margin: 40px 0; }
+
+  /* Print */
+  @media print {
+    .page { padding: 20px 30px; }
+    pre { font-size: 8.5pt; }
+    .diagram { font-size: 8.5pt; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- COVER -->
+  <div class="cover">
+    <div class="logo">Bluesprings AI · Cyber Towers</div>
+    <h1>Temporal Workflows<br>Vehicle Access Dashboard</h1>
+    <div class="subtitle">Complete Workflow Design Document — For Review</div>
+    <div class="meta">Prepared for: Pavan K · Document Version 1.0 · June 2026</div>
+    <div class="status-badge">⚠ FOR REVIEW — No Code Built Yet</div>
+  </div>
+
+  <!-- TOC -->
+  <div class="toc">
+    <h2>Table of Contents</h2>
+    <ol>
+      <li><a href="#s1">What is Temporal — Key Concepts Reference</a></li>
+      <li><a href="#s2">Why This Project Needs Temporal</a></li>
+      <li><a href="#s3">Current Problems in the Codebase (Precise)</a></li>
+      <li><a href="#wf1">Workflow 1 — Vehicle Session Lifecycle</a></li>
+      <li><a href="#wf2">Workflow 2 — Overstay Alert &amp; Escalation</a></li>
+      <li><a href="#wf3">Workflow 3 — Unauthorized Vehicle Approval</a></li>
+      <li><a href="#wf4">Workflow 4 — Daily Summary Report</a></li>
+      <li><a href="#wf5">Workflow 5 — Weekly Analytics Report</a></li>
+      <li><a href="#wf6">Workflow 6 — Gate Health Monitor</a></li>
+      <li><a href="#wf7">Workflow 7 — Parking Slot Management</a></li>
+      <li><a href="#wf8">Workflow 8 — Vehicle Registry Sync</a></li>
+      <li><a href="#map">Workflow Relationship Map</a></li>
+      <li><a href="#priority">Implementation Priority Order</a></li>
+    </ol>
+  </div>
+
+  <!-- SECTION 1 -->
+  <h1 class="section" id="s1">1. What is Temporal — Key Concepts Reference</h1>
+
+  <table>
+    <tr><th>Concept</th><th>What It Means (Plain English)</th><th>Used In This Project For</th></tr>
+    <tr><td><strong>Workflow</strong></td><td>A function that runs as a long-running business process. It can sleep for hours or days and will resume exactly where it left off — even after a server crash.</td><td>Tracking a vehicle from entry to exit, running scheduled reports</td></tr>
+    <tr><td><strong>Activity</strong></td><td>A single unit of work inside a workflow — like querying the DB, sending an email, or writing a record. Activities are retried automatically if they fail.</td><td>Sending alert emails, querying CardRecord table, updating parking</td></tr>
+    <tr><td><strong>Signal</strong></td><td>A message sent INTO a running workflow from outside. The workflow is waiting for something to happen in the real world.</td><td>Vehicle exit scan arriving, security officer approving an entry</td></tr>
+    <tr><td><strong>Query</strong></td><td>Reading the current state of a running workflow without changing anything.</td><td>Dashboard asking "is this vehicle still inside?" live</td></tr>
+    <tr><td><strong>Timer (sleep)</strong></td><td><code>await sleep('24 hours')</code> — Temporal stores this timer. Your server can restart, and the timer will fire at the right time.</td><td>24-hour overstay detection per vehicle</td></tr>
+    <tr><td><strong>Schedule</strong></td><td>Run a workflow on a cron schedule. If the server was down when it was supposed to run, Temporal runs it when the server comes back.</td><td>Daily report at 11:59 PM, weekly report on Fridays</td></tr>
+    <tr><td><strong>Child Workflow</strong></td><td>A workflow started by another workflow. Can be waited for or detached (runs independently).</td><td>Overstay Alert started by Vehicle Session workflow</td></tr>
+    <tr><td><strong>Worker</strong></td><td>Your Node.js process that runs workflow and activity code. Connects to the Temporal server.</td><td>The backend server.js will also start a Temporal Worker</td></tr>
+  </table>
+
+  <!-- SECTION 2 -->
+  <h1 class="section" id="s2">2. Why This Project Needs Temporal</h1>
+
+  <p style="font-size:11pt; line-height:1.8; margin-bottom:14px;">
+    The vehicle access dashboard manages time-sensitive, stateful business processes. A vehicle enters and must be tracked for potentially 24+ hours. An unauthorized vehicle needs a security officer's decision within 30 minutes. Daily report emails must be sent even if the server went down at 11:59 PM and came back at 12:03 AM. These are all <strong>durable workflows</strong> — they must survive crashes, remember state, and react to real-world events.
+  </p>
+  <p style="font-size:11pt; line-height:1.8; margin-bottom:14px;">
+    Currently, all of this is handled by <code>node-cron</code> (which forgets on restart), in-memory JavaScript objects (lost on crash), and browser <code>localStorage</code> (not reliable for business workflows). Temporal is designed exactly for this problem.
+  </p>
+
+  <div class="summary-grid">
+    <div class="summary-card"><div class="num">8</div><div class="lbl">Workflows Designed</div></div>
+    <div class="summary-card"><div class="num">3</div><div class="lbl">Existing Files Replaced</div></div>
+    <div class="summary-card"><div class="num">2</div><div class="lbl">New Capabilities Added</div></div>
+    <div class="summary-card"><div class="num">0</div><div class="lbl">Lines of Code Built Yet</div></div>
+  </div>
+
+  <!-- SECTION 3 -->
+  <h1 class="section" id="s3">3. Current Problems in the Codebase (Precise)</h1>
+
+  <h3>Problem 1 — <code>backend/services/cronJobs.js</code></h3>
+  <pre>// Line 7 — In-memory warning tracker (wiped every server restart)
+const warned24hVehicles = {};
+
+// Line 238 — If server is down at 11:59 PM, this email is NEVER sent
+// node-cron has no catch-up logic for missed schedules
+cron.schedule('59 23 * * *', () => { sendDailySummary(); });</pre>
+  <p style="font-size:10.5pt; color:#475569; margin-bottom:18px;"><strong>What we lose:</strong> After a server restart, all vehicles previously warned about overstay are warned again (duplicate emails). If the server is down at 11:59 PM, the daily summary is permanently missed.</p>
+
+  <h3>Problem 2 — <code>frontend/src/utils/localAccessApprovalsStorage.js</code></h3>
+  <p style="font-size:10.5pt; color:#475569; margin-bottom:18px;">The unauthorized vehicle approval system lives in the browser's <code>localStorage</code>. If security opens the dashboard in a different browser tab, they don't see approvals from the first tab. There is no timeout — unauthorized vehicles stay "pending" forever. There is no server-side record of who approved what and when.</p>
+
+  <h3>Problem 3 — No Gate Health Monitoring</h3>
+  <p style="font-size:10.5pt; color:#475569; margin-bottom:18px;">The <code>getEventCounts</code> function in <code>statsController.js</code> does check RFID vs traffic light mismatch — but only when a user manually clicks the Health Check button on the dashboard. There is no automated alerting if Gate 1's RFID reader stops working at 2 AM.</p>
+
+  <h3>Problem 4 — Fragile Personnel Cache</h3>
+  <p style="font-size:10.5pt; color:#475569; margin-bottom:18px;">In <code>personnelCache.js</code>, the cache is refreshed synchronously inside the WebSocket poll loop (line 55 of websocket.js: <code>const personnelMap = await getPersonnelMap()</code>). If the DB is slow, this blocks real-time scan broadcasting. On server restart, the cache is cold.</p>
+
+  <hr class="divider">
+
+  <!-- WORKFLOW 1 -->
+  <div class="workflow-band" id="wf1">
+    <div class="wf-number">Workflow 1</div>
+    <div class="wf-name">Vehicle Session Lifecycle</div>
+    <div class="wf-tagline">One workflow per vehicle entry — tracks entry to exit with durable state</div>
+  </div>
+
+  <div class="info-row">
+    <div class="info-pill"><strong>Type:</strong> Event-driven, per-vehicle</div>
+    <div class="info-pill"><strong>Duration:</strong> Minutes to 72 hours</div>
+    <div class="info-pill"><strong>Trigger:</strong> PortNum=1 scan detected</div>
+    <div class="info-pill"><strong>Priority:</strong> 3 of 8</div>
+  </div>
+
+  <h3>Purpose</h3>
+  <div class="purpose-box">
+    <p>This is the <strong>core workflow</strong> of the entire system. One instance runs for every vehicle that enters the premises. It holds live state for a vehicle session — entry time, gate, vehicle type — and waits for either an exit scan signal or a timeout. All other vehicle-related workflows (overstay alert, parking management) are started as children of this workflow.</p>
+  </div>
+
+  <h3>What Problem It Solves</h3>
+  <div class="problem-box">
+    <div class="label">Current Code</div>
+    <p>Session reconstruction happens at query time via the SQL CTE <code>buildSessionCTE</code> in <code>reportcontroller.js</code> lines 7–60. The system has no live, running state per vehicle. Every time the occupancy page is loaded, it re-runs the entire CTE. There is no way to ask "is this specific vehicle inside right now?" without a DB query.</p>
+  </div>
+
+  <h3>Trigger</h3>
+  <p style="font-size:11pt; margin-bottom:12px;">The WebSocket polling loop in <code>websocket.js</code> detects a new RFID entry scan (<code>PortNum=1</code>) and starts a new Temporal Workflow.</p>
+  <p style="font-size:11pt; margin-bottom:12px;"><strong>Workflow ID:</strong> <code>vehicle-session-{CardData}-{entryTimestamp}</code></p>
+
+  <h3>Signals (Inputs While Running)</h3>
+  <table>
+    <tr><th>Signal Name</th><th>Sent By</th><th>Payload</th><th>Effect</th></tr>
+    <tr><td><code>vehicle-exited</code></td><td>WebSocket polling (PortNum=2 scan)</td><td>exitTime, exitGate, exitCardRecordId</td><td>Completes session, cancels overstay child</td></tr>
+    <tr><td><code>manually-closed</code></td><td>Admin from dashboard</td><td>reason, adminName</td><td>Force-closes session if RFID exit failed</td></tr>
+  </table>
+
+  <h3>Queries (Read State Without Changing It)</h3>
+  <table>
+    <tr><th>Query Name</th><th>Returns</th><th>Used By</th></tr>
+    <tr><td><code>getSessionStatus</code></td><td>status, entryTime, vehicleType, hoursInside</td><td>Dashboard occupancy API, health check</td></tr>
+    <tr><td><code>isInsidePremises</code></td><td>boolean</td><td>Overstay workflow checking if vehicle still inside</td></tr>
+  </table>
+
+  <h3>Workflow Steps</h3>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><strong><span class="activity-tag">ACTIVITY</span> recordEntryToAuditLog(entryData)</strong><p>Write entry event to audit log. Retry: 5 times with 10s exponential backoff.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><strong><span class="activity-tag">ACTIVITY</span> checkParkingSlotAssignment(cardData)</strong><p>Query parking allocations for this card. Returns: <code>{ hasSlot: boolean, slotLabel: string | null }</code></p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><strong>If no parking slot: <span class="signal-tag">CHILD WORKFLOW</span> ParkingSlotManagementWorkflow</strong><p>Start Workflow 7 as a detached child (runs independently). Do not wait for it.</p></div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-body"><strong><span class="signal-tag">CHILD WORKFLOW</span> Start OverstayAlertWorkflow (Workflow 2)</strong><p>Pass: cardData, entryTime, vehicleType, pCode. This child runs independently and handles the 24-hour timer.</p></div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-body"><strong><span class="wait-tag">WAIT</span> Signal('vehicle-exited') OR Signal('manually-closed')</strong><p>The workflow <strong>sleeps here</strong> — could be minutes, hours, or days. Temporal's durable timer keeps this alive across server restarts.</p></div></div>
+    <div class="step"><div class="step-num">6</div><div class="step-body"><strong>On 'vehicle-exited' signal:</strong><p>Cancel OverstayAlertWorkflow child. Record exit to audit log. Release parking slot. Compute session duration. <strong>Workflow ends successfully.</strong></p></div></div>
+    <div class="step"><div class="step-num">7</div><div class="step-body"><strong>MAX TIMEOUT (72 hours):</strong><p>If neither signal received in 72 hours, send final critical alert and terminate workflow.</p></div></div>
+  </div>
+
+  <h3>What This Replaces in Current Code</h3>
+  <table>
+    <tr><th>File</th><th>Lines</th><th>What Is Replaced</th></tr>
+    <tr><td>reportcontroller.js</td><td>7–60</td><td>buildSessionCTE — session state is now live, not computed at query time</td></tr>
+    <tr><td>reportcontroller.js</td><td>274–326</td><td>getVehicleOccupancy — can query running workflows directly</td></tr>
+  </table>
+
+  <hr class="divider">
+
+  <!-- WORKFLOW 2 -->
+  <div class="workflow-band" id="wf2">
+    <div class="wf-number">Workflow 2</div>
+    <div class="wf-name">Overstay Alert &amp; Escalation</div>
+    <div class="wf-tagline">Per-vehicle durable 24-hour timer — survives server crashes — replaces cronJobs.js</div>
+  </div>
+
+  <div class="info-row">
+    <div class="info-pill"><strong>Type:</strong> Child of Workflow 1</div>
+    <div class="info-pill"><strong>Duration:</strong> 24–72 hours</div>
+    <div class="info-pill"><strong>Trigger:</strong> Started by Workflow 1 on entry</div>
+    <div class="info-pill"><strong>Priority:</strong> 2 of 8 (high)</div>
+  </div>
+
+  <h3>Purpose</h3>
+  <div class="purpose-box">
+    <p>One instance of this workflow runs for every vehicle that enters. It waits exactly 24 hours from entry time using Temporal's durable timer. If the vehicle exits before 24 hours, the parent workflow cancels this child cleanly. If the vehicle is still inside after 24 hours, it sends an alert and continues escalating every 12 hours.</p>
+  </div>
+
+  <h3>The Key Problem It Fixes</h3>
+  <div class="comparison">
+    <div class="comp-card before">
+      <div class="comp-label">❌ Current Code (cronJobs.js)</div>
+      <ul>
+        <li><code>warned24hVehicles</code> is an in-memory JS object — wiped on every server restart</li>
+        <li>Cron runs every 30 minutes checking ALL vehicles — inefficient SQL query every 30 min</li>
+        <li>Server crash at 3 AM → all vehicles warned again on restart (duplicate emails)</li>
+        <li>No escalation after first 24h alert</li>
+      </ul>
+    </div>
+    <div class="comp-card after">
+      <div class="comp-label">✅ With Temporal</div>
+      <ul>
+        <li>Per-vehicle timer — each vehicle has its own independent 24h countdown</li>
+        <li>Timer stored in Temporal's event history — survives any crash</li>
+        <li>No duplicate alerts on restart — state is durable</li>
+        <li>Built-in escalation: 24h → 36h → 48h → 72h</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Alert Escalation Timeline</h3>
+  <div class="alert-timeline">
+    <div class="timeline-item t1"><div class="time">24h</div><div class="label">Warning<br>→ Admin Email</div></div>
+    <div class="timeline-item t2"><div class="time">36h</div><div class="label">Escalation L1<br>→ Admin Email</div></div>
+    <div class="timeline-item t3"><div class="time">48h</div><div class="label">Critical<br>→ Admin + Manager</div></div>
+    <div class="timeline-item t4"><div class="time">72h</div><div class="label">FINAL<br>→ Full Team</div></div>
+  </div>
+
+  <h3>Workflow Steps</h3>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><strong><span class="timer-tag">TIMER</span> sleep('24 hours') from entry time</strong><p>If vehicle exits before this fires, Workflow 1 cancels this child workflow. Timer is discarded. If server restarts during this 24h wait, Temporal resumes the timer where it left off.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Timer fires — vehicle still inside after 24 hours:</strong><p><span class="activity-tag">ACTIVITY</span> fetchVehicleDetails(cardData) — get latest info from Personnel cache.<br><span class="activity-tag">ACTIVITY</span> sendOverstayAlertEmail({ cardData, vehicleType, pCode, entryTime, hoursInside: 24 }) — Retry 5 times, 30s backoff.</p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><strong><span class="timer-tag">LOOP</span> Every 12 hours — check if still inside:</strong><p><span class="activity-tag">ACTIVITY</span> checkVehicleStillInside(cardData) — queries Workflow 1's <code>isInsidePremises</code> query.<br>If still inside: send escalation email with increasing urgency. If exited: workflow ends cleanly.</p></div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-body"><strong>At 72 hours — final critical alert:</strong><p><span class="activity-tag">ACTIVITY</span> sendCriticalEscalationEmail() — to Admin + Facility Manager + Security Head.<br>Workflow terminates after this.</p></div></div>
+  </div>
+
+  <h3>What This Replaces in Current Code</h3>
+  <table>
+    <tr><th>File</th><th>Lines</th><th>What Is Replaced</th></tr>
+    <tr><td>cronJobs.js</td><td>7</td><td>const warned24hVehicles = {} — the in-memory dict</td></tr>
+    <tr><td>cronJobs.js</td><td>68–172</td><td>check24HourStays() entire function</td></tr>
+    <tr><td>cronJobs.js</td><td>238</td><td>cron.schedule('30 * * * *', ...) hourly cron</td></tr>
+  </table>
+
+  <hr class="divider">
+
+  <!-- WORKFLOW 3 -->
+  <div class="workflow-band" id="wf3">
+    <div class="wf-number">Workflow 3</div>
+    <div class="wf-name">Unauthorized Vehicle Approval</div>
+    <div class="wf-tagline">Server-side approval process — replaces localStorage — with timeout &amp; notifications</div>
+  </div>
+
+  <div class="info-row">
+    <div class="info-pill"><strong>Type:</strong> Event-driven, per unauthorized entry</div>
+    <div class="info-pill"><strong>Duration:</strong> Up to 2 hours</div>
+    <div class="info-pill"><strong>Trigger:</strong> PortNum=1 scan with empty PCode</div>
+    <div class="info-pill"><strong>Priority:</strong> 4 of 8</div>
+  </div>
+
+  <h3>Purpose</h3>
+  <div class="purpose-box">
+    <p>When an unregistered vehicle (empty <code>PCode</code>) enters the gate, this workflow starts. It notifies the security officer on duty, then waits for a human decision — approve or deny. The entire approval process is server-side, durable, and has a timeout. No more browser localStorage approvals that disappear when the tab is closed.</p>
+  </div>
+
+  <h3>What Problem It Fixes</h3>
+  <div class="problem-box">
+    <div class="label">Current Code Location</div>
+    <p><code>LiveEntryExitPage.jsx</code> lines 276–310 and <code>LiveTable.jsx</code> lines 261–295 — both store approvals in <code>vehicleAccess.localApprovals.v1</code> localStorage key. If security opens a different browser, they see different approval data. There is no 30-minute timeout. No server notification sent.</p>
+  </div>
+
+  <h3>Signals (Human Input Into the Workflow)</h3>
+  <table>
+    <tr><th>Signal Name</th><th>Payload</th><th>Sent By</th><th>Effect</th></tr>
+    <tr><td><code>approval-granted</code></td><td>vehicleNo, remark, approvedBy, approvedAt</td><td>Security officer via dashboard</td><td>Grants access, stores in audit log, broadcasts to all dashboard clients</td></tr>
+    <tr><td><code>approval-denied</code></td><td>reason, deniedBy</td><td>Security officer</td><td>Marks as denied, triggers security alert</td></tr>
+  </table>
+
+  <h3>New API Endpoints This Requires</h3>
+  <pre>POST /api/approvals/grant
+  Body: { workflowId, vehicleNo, remark, approvedBy }
+  → Sends 'approval-granted' signal to the running workflow
+
+POST /api/approvals/deny
+  Body: { workflowId, reason, deniedBy }
+  → Sends 'approval-denied' signal
+
+GET /api/approvals/status/:cardData
+  → Queries the workflow: returns { status: 'pending'/'approved'/'denied'/'timed-out' }</pre>
+
+  <h3>Timeout Escalation</h3>
+  <table>
+    <tr><th>Time Since Entry</th><th>Action</th><th>Recipient</th></tr>
+    <tr><td>30 minutes</td><td>First reminder alert</td><td>Security officer on duty</td></tr>
+    <tr><td>60 minutes</td><td>Escalation alert</td><td>Facility manager</td></tr>
+    <tr><td>2 hours</td><td>Final escalation, workflow ends (status: timed-out)</td><td>Senior management</td></tr>
+  </table>
+
+  <h3>What This Replaces in Current Code</h3>
+  <table>
+    <tr><th>File</th><th>What Is Replaced</th></tr>
+    <tr><td>frontend/src/utils/localAccessApprovalsStorage.js</td><td>Entire file — localStorage approval store moves server-side</td></tr>
+    <tr><td>LiveEntryExitPage.jsx lines 276–310</td><td>saveAllowRemark() — replaced by POST /api/approvals/grant</td></tr>
+    <tr><td>LiveTable.jsx lines 261–295</td><td>saveAllowRemark() — same replacement</td></tr>
+  </table>
+
+  <hr class="divider">
+
+  <!-- WORKFLOW 4 -->
+  <div class="workflow-band" id="wf4">
+    <div class="wf-number">Workflow 4</div>
+    <div class="wf-name">Daily Summary Report</div>
+    <div class="wf-tagline">Scheduled 11:59 PM every night — catches up if server was down</div>
+  </div>
+
+  <div class="info-row">
+    <div class="info-pill"><strong>Type:</strong> Scheduled (Temporal Schedule)</div>
+    <div class="info-pill"><strong>Schedule:</strong> 59 23 * * * (11:59 PM daily)</div>
+    <div class="info-pill"><strong>Duration:</strong> ~5 minutes</div>
+    <div class="info-pill"><strong>Priority:</strong> 1 of 8 (easiest &amp; most impactful)</div>
+  </div>
+
+  <h3>Purpose</h3>
+  <div class="purpose-box">
+    <p>Generate and send the nightly vehicle access summary email. Same business logic as today's <code>sendDailySummary()</code> — but with guaranteed delivery even if the server was down at 11:59 PM, email retry logic, and additional metrics (unauthorized entries, vehicle type breakdown).</p>
+  </div>
+
+  <h3>Workflow Steps</h3>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-body"><strong><span class="activity-tag">ACTIVITY</span> fetchDayEntryExitStats(reportDate)</strong><p>Query CardRecord for today's totals. Retry: 5 times, 30s backoff. Timeout: 2 minutes per attempt.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><strong><span class="activity-tag">ACTIVITY</span> fetchCurrentlyInsideCount()</strong><p>Count active VehicleSession workflows (vehicles still inside). Retry: 3 times.</p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><strong><span class="activity-tag">ACTIVITY</span> fetchUnauthorizedEntryCount(reportDate)</strong><p>NEW metric — how many unauthorized scans occurred today. Not in current code.</p></div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-body"><strong><span class="activity-tag">ACTIVITY</span> generateDailyReportEmail(allStats)</strong><p>Build HTML email body with all collected statistics.</p></div></div>
+    <div class="step"><div class="step-num">5</div><div class="step-body"><strong><span class="activity-tag">ACTIVITY</span> sendEmailReport(subject, htmlContent, recipients)</strong><p>Uses existing <code>sendNotification()</code> from emailService.js. Retry: 5 times with exponential backoff (1m → 2m → 4m → 8m → 16m).</p></div></div>
+    <div class="step"><div class="step-num">6</div><div class="step-body"><strong><span class="activity-tag">ACTIVITY</span> archiveReportData(reportDate, stats)</strong><p>Store report data for audit trail. Workflow ends.</p></div></div>
+  </div>
+
+  <h3>What This Replaces</h3>
+  <table>
+    <tr><th>File</th><th>Lines</th><th>What Is Replaced</th></tr>
+    <tr><td>cronJobs.js</td><td>174–232</td><td>sendDailySummary() entire function</td></tr>
+    <tr><td>cronJobs.js</td><td>243</td><td>cron.schedule('59 23 * * *', ...) daily cron</td></tr>
+  </table>
+
+  <hr class="divider">
+
+  <!-- WORKFLOW 5 -->
+  <div class="workflow-band" id="wf5">
+    <div class="wf-number">Workflow 5</div>
+    <div class="wf-name">Weekly Analytics Report</div>
+    <div class="wf-tagline">Friday 11 PM — rich report with trends, peak hours, overstay incidents</div>
+  </div>
+
+  <div class="info-row">
+    <div class="info-pill"><strong>Type:</strong> Scheduled (Temporal Schedule)</div>
+    <div class="info-pill"><strong>Schedule:</strong> 0 23 * * 5 (Friday 11 PM)</div>
+    <div class="info-pill"><strong>Duration:</strong> ~10 minutes</div>
+    <div class="info-pill"><strong>Priority:</strong> 6 of 8</div>
+  </div>
+
+  <h3>Purpose</h3>
+  <div class="purpose-box">
+    <p>Every Friday evening, generate a week-in-review report for facility management. This is richer than the daily report — it includes trend analysis, peak hours, overstay incidents, and Gate 1 vs Gate 2 utilization. This is entirely <strong>new functionality</strong> that does not exist in the current system.</p>
+  </div>
+
+  <h3>Report Contents (What's New vs Current System)</h3>
+  <table>
+    <tr><th>Section</th><th>In Current System</th><th>Weekly Report Adds</th></tr>
+    <tr><td>Daily entry/exit counts</td><td>✅ StatsCards (Day/Week)</td><td>Per day of week breakdown</td></tr>
+    <tr><td>Peak hours</td><td>✅ VehicleChart (hourly)</td><td>Top 3 busiest hours of the week</td></tr>
+    <tr><td>Overstay incidents</td><td>Partial (24h alert only)</td><td>Full list with company name, duration</td></tr>
+    <tr><td>Gate utilization</td><td>❌ Not tracked</td><td>Gate 1 vs Gate 2 traffic % split</td></tr>
+    <tr><td>Unauthorized entries</td><td>❌ Not in reports</td><td>Count, approval rate, denied count</td></tr>
+    <tr><td>Week-over-week trend</td><td>❌ Not available</td><td>+/- vs previous week</td></tr>
+  </table>
+
+  <hr class="divider">
+
+  <!-- WORKFLOW 6 -->
+  <div class="workflow-band" id="wf6">
+    <div class="wf-number">Workflow 6</div>
+    <div class="wf-name">Gate Health Monitor</div>
+    <div class="wf-tagline">Singleton — runs forever — alerts when RFID reader goes silent</div>
+  </div>
+
+  <div class="info-row">
+    <div class="info-pill"><strong>Type:</strong> Singleton, runs continuously</div>
+    <div class="info-pill"><strong>Duration:</strong> Forever (until stopped)</div>
+    <div class="info-pill"><strong>Trigger:</strong> Started once when server boots</div>
+    <div class="info-pill"><strong>Priority:</strong> 5 of 8</div>
+  </div>
+
+  <h3>Purpose</h3>
+  <div class="purpose-box">
+    <p>Every 5 minutes during business hours (8 AM – 8 PM), check if each gate's RFID reader has sent at least one scan in the last 30 minutes. If Gate 1 or Gate 2 is silent during business hours, alert the facility manager. This is entirely new functionality — no equivalent exists in the current codebase.</p>
+  </div>
+
+  <h3>Durable State (Stored in Temporal — Survives Restarts)</h3>
+  <pre>// This state is remembered even after server crashes
+{
+  gate1: {
+    lastScanTime: "2026-06-03T09:15:22",
+    isCurrentlyOffline: false,
+    offlineSince: null,
+    alertsSentCount: 0,
+    lastAlertSent: null
+  },
+  gate2: {
+    lastScanTime: "2026-06-03T09:14:55",
+    isCurrentlyOffline: false,
+    offlineSince: null,
+    alertsSentCount: 0,
+    lastAlertSent: null
+  }
+}</pre>
+
+  <h3>Alert Conditions</h3>
+  <table>
+    <tr><th>Condition</th><th>Alert Level</th><th>Recipient</th></tr>
+    <tr><td>Gate silent 30 min (business hours)</td><td>Warning</td><td>Facility manager email</td></tr>
+    <tr><td>Gate silent 60 min (business hours)</td><td>Escalation</td><td>Facility manager + senior management</td></tr>
+    <tr><td>Gate comes back online after being offline</td><td>Resolution</td><td>Same recipients — "Gate X is back online"</td></tr>
+    <tr><td>BOTH gates silent simultaneously</td><td>Critical</td><td>Full team — possible network issue</td></tr>
+  </table>
+
+  <h3>Device ID Reference (from current codebase)</h3>
+  <p style="font-size:11pt; margin-bottom:12px;">From <code>LiveEntryExitPage.jsx</code> and <code>LiveTable.jsx</code>:</p>
+  <pre>// Device 14070001 = Gate 1
+// Device 24074151 = Gate 2
+const gateNum = name.includes('24074151') ? 2 : 1;</pre>
+  <p style="font-size:10.5pt; color:#475569;">The workflow monitors both device IDs. A scan count of 0 from a device during business hours = likely offline.</p>
+
+  <hr class="divider">
+
+  <!-- WORKFLOW 7 -->
+  <div class="workflow-band" id="wf7">
+    <div class="wf-number">Workflow 7</div>
+    <div class="wf-name">Parking Slot Management</div>
+    <div class="wf-tagline">Detached child of Workflow 1 — notifies facility manager when no slot assigned</div>
+  </div>
+
+  <div class="info-row">
+    <div class="info-pill"><strong>Type:</strong> Detached child of Workflow 1</div>
+    <div class="info-pill"><strong>Duration:</strong> Up to 2 hours</div>
+    <div class="info-pill"><strong>Trigger:</strong> Vehicle enters with no parking slot</div>
+    <div class="info-pill"><strong>Priority:</strong> 7 of 8</div>
+  </div>
+
+  <h3>Purpose</h3>
+  <div class="purpose-box">
+    <p>When a registered vehicle enters but has no assigned parking slot, notify the facility manager and wait for a slot to be assigned. This is currently handled only in the browser UI — if the facility manager is not on the dashboard, nothing happens.</p>
+  </div>
+
+  <h3>Signal</h3>
+  <table>
+    <tr><th>Signal Name</th><th>Payload</th><th>Effect</th></tr>
+    <tr><td><code>slot-assigned</code></td><td>slotLabel, assignedBy</td><td>Records slot assignment, broadcasts to all WebSocket clients, workflow ends</td></tr>
+    <tr><td><code>no-slot-available</code></td><td>reason</td><td>Directs vehicle to overflow parking, workflow ends</td></tr>
+  </table>
+
+  <h3>What This Replaces</h3>
+  <table>
+    <tr><th>File</th><th>What Is Replaced</th></tr>
+    <tr><td>ConfigPage.jsx lines 268–300</td><td>upsertParkingForCard() — UI-only parking assignment moves to server-side workflow</td></tr>
+    <tr><td>frontend/src/utils/parkingStorage.js</td><td>localStorage parking store — becomes server-side</td></tr>
+  </table>
+
+  <hr class="divider">
+
+  <!-- WORKFLOW 8 -->
+  <div class="workflow-band" id="wf8">
+    <div class="wf-number">Workflow 8</div>
+    <div class="wf-name">Vehicle Registry Sync</div>
+    <div class="wf-tagline">Every 55 seconds — proactive cache warm — decouples DB from live scan path</div>
+  </div>
+
+  <div class="info-row">
+    <div class="info-pill"><strong>Type:</strong> Scheduled (every 55 seconds)</div>
+    <div class="info-pill"><strong>Duration:</strong> ~10 seconds</div>
+    <div class="info-pill"><strong>Trigger:</strong> Temporal Schedule</div>
+    <div class="info-pill"><strong>Priority:</strong> 8 of 8 (lowest urgency)</div>
+  </div>
+
+  <h3>Purpose</h3>
+  <div class="purpose-box">
+    <p>The Personnel cache in <code>personnelCache.js</code> is currently refreshed synchronously inside the WebSocket poll loop. This means a slow DB query can delay real-time scan broadcasting. This workflow moves cache refresh to a background scheduled process, so the live scan path never has to wait for a DB query.</p>
+  </div>
+
+  <h3>What This Fixes</h3>
+  <p style="font-size:11pt; margin-bottom:12px;">In <code>websocket.js</code> line 55:</p>
+  <pre>// CURRENT — DB query happens synchronously inside the 3-second poll loop
+// If DB is slow, this delays broadcasting new scans to the dashboard
+const personnelMap = await getPersonnelMap(); // ← problem
+
+// WITH TEMPORAL — personnelMap is always pre-cached by a background workflow
+// The poll loop just reads from cache, never waits for DB
+const personnelMap = getCachedPersonnelMap(); // instant</pre>
+
+  <h3>New Dashboard Metric This Enables</h3>
+  <p style="font-size:11pt; margin-bottom:12px;">The Health Check modal in <code>Dashboard.jsx</code> currently only shows "Database: Reachable". With this workflow:</p>
+  <table>
+    <tr><th>Current Health Check</th><th>Enhanced Health Check</th></tr>
+    <tr><td>Database: Reachable ✅</td><td>Database: Reachable ✅</td></tr>
+    <tr><td>(nothing about cache)</td><td>Personnel Cache: 1,245 records, synced 42 seconds ago ✅</td></tr>
+    <tr><td>(nothing about cache)</td><td>2-Wheelers: 612 / 4-Wheelers: 510 / Unknown: 123</td></tr>
+  </table>
+
+  <hr class="divider">
+
+  <!-- RELATIONSHIP MAP -->
+  <h1 class="section" id="map">12. Workflow Relationship Map</h1>
+
+  <div class="diagram">                          RFID Scan Detected
+                          (websocket.js polling loop)
+                                  │
+                    ┌─────────────┴─────────────┐
+                    │                           │
+               PortNum = 1                 PortNum = 2
+               (Entry Scan)                (Exit Scan)
+               PCode not empty             (any card)
+                    │                           │
+                    ▼                           │
+         ┌─────────────────────┐               │
+         │  WORKFLOW 1          │     Signal 'vehicle-exited'
+         │  Vehicle Session     │◄──────────────┘
+         │  Lifecycle           │
+         └──────┬──────┬───────┘
+                │      │
+        ┌───────┘      └────────────────────────┐
+        ▼                                       ▼
+┌──────────────────┐                  ┌──────────────────────┐
+│  WORKFLOW 2      │                  │  WORKFLOW 7           │
+│  Overstay Alert  │                  │  Parking Slot Mgmt   │
+│  & Escalation    │                  │  (if no slot)        │
+│  (child)         │                  │  (detached child)    │
+└──────────────────┘                  └──────────────────────┘
+
+           PCode = empty + PortNum = 1
+           (Unauthorized Entry)
+                    │
+                    ▼
+         ┌────────────────────────┐
+         │  WORKFLOW 3            │
+         │  Unauthorized Vehicle  │
+         │  Approval              │
+         └────────────────────────┘
+
+                    SCHEDULED WORKFLOWS
+         ┌────────────────────────────────────┐
+         │  WORKFLOW 4 — Daily Summary Report │
+         │  11:59 PM every day                │
+         └────────────────────────────────────┘
+         ┌────────────────────────────────────┐
+         │  WORKFLOW 5 — Weekly Report        │
+         │  Friday 11:00 PM                   │
+         └────────────────────────────────────┘
+         ┌────────────────────────────────────┐
+         │  WORKFLOW 8 — Registry Sync        │
+         │  Every 55 seconds                  │
+         └────────────────────────────────────┘
+
+                    SINGLETON WORKFLOW
+         ┌────────────────────────────────────┐
+         │  WORKFLOW 6 — Gate Health Monitor  │
+         │  Runs continuously                 │
+         └────────────────────────────────────┘</div>
+
+  <hr class="divider">
+
+  <!-- PRIORITY -->
+  <h1 class="section" id="priority">13. Implementation Priority Order</h1>
+
+  <table>
+    <tr><th>#</th><th>Workflow</th><th>Priority Reason</th><th>Replaces Existing Code</th></tr>
+    <tr class="priority-1"><td><strong>1</strong></td><td>Workflow 4 — Daily Summary Report</td><td>Easiest to implement. Immediate value. Fixes the "missed report if server down" bug.</td><td>sendDailySummary() + daily cron in cronJobs.js</td></tr>
+    <tr class="priority-2"><td><strong>2</strong></td><td>Workflow 2 — Overstay Alert &amp; Escalation</td><td>High business value. Fixes the crash-recovery duplicate email bug. Replaces fragile in-memory state.</td><td>check24HourStays() + warned24hVehicles in cronJobs.js</td></tr>
+    <tr class="priority-3"><td><strong>3</strong></td><td>Workflow 1 — Vehicle Session Lifecycle</td><td>Core workflow needed for others to function. Required before Workflows 2 and 7 can be children of it.</td><td>buildSessionCTE, getVehicleOccupancy in reportcontroller.js</td></tr>
+    <tr class="priority-4"><td><strong>4</strong></td><td>Workflow 3 — Unauthorized Approval</td><td>Removes localStorage dependency. Adds timeout and server-side audit trail.</td><td>localAccessApprovalsStorage.js, saveAllowRemark() in LiveEntryExitPage + LiveTable</td></tr>
+    <tr class="priority-5"><td><strong>5</strong></td><td>Workflow 6 — Gate Health Monitor</td><td>New capability with high operational value for Cyber Towers.</td><td>New (no current equivalent)</td></tr>
+    <tr><td><strong>6</strong></td><td>Workflow 5 — Weekly Report</td><td>Enhancement. Builds on daily report infrastructure.</td><td>New capability</td></tr>
+    <tr><td><strong>7</strong></td><td>Workflow 7 — Parking Slot Mgmt</td><td>Enhancement. Removes localStorage for parking.</td><td>parkingStorage.js, upsertParkingForCard() in ConfigPage</td></tr>
+    <tr><td><strong>8</strong></td><td>Workflow 8 — Registry Sync</td><td>Low urgency but improves reliability of the live scan path.</td><td>personnelCache.js getPersonnelMap()</td></tr>
+  </table>
+
+  <!-- FINAL SUMMARY -->
+  <hr class="divider">
+  <h1 class="section">Summary — All 8 Workflows</h1>
+
+  <table>
+    <tr><th>#</th><th>Workflow Name</th><th>Type</th><th>Duration</th><th>New / Replaces</th></tr>
+    <tr><td>1</td><td>Vehicle Session Lifecycle</td><td>Per-vehicle, event-driven</td><td>Minutes – 72h</td><td>Replaces SQL CTE session logic</td></tr>
+    <tr><td>2</td><td>Overstay Alert &amp; Escalation</td><td>Child of Workflow 1</td><td>24–72 hours</td><td>Replaces check24HourStays() + cron</td></tr>
+    <tr><td>3</td><td>Unauthorized Vehicle Approval</td><td>Per-entry, event-driven</td><td>Up to 2 hours</td><td>Replaces localStorage approval system</td></tr>
+    <tr><td>4</td><td>Daily Summary Report</td><td>Scheduled (nightly)</td><td>~5 minutes</td><td>Replaces sendDailySummary() + cron</td></tr>
+    <tr><td>5</td><td>Weekly Analytics Report</td><td>Scheduled (weekly)</td><td>~10 minutes</td><td>New capability</td></tr>
+    <tr><td>6</td><td>Gate Health Monitor</td><td>Singleton, continuous</td><td>Forever</td><td>New capability</td></tr>
+    <tr><td>7</td><td>Parking Slot Management</td><td>Detached child of WF1</td><td>Up to 2 hours</td><td>Replaces localStorage parking system</td></tr>
+    <tr><td>8</td><td>Vehicle Registry Sync</td><td>Scheduled (every 55s)</td><td>~10 seconds</td><td>Enhances personnelCache.js</td></tr>
+  </table>
+
+  <div style="text-align:center; margin-top:40px; padding-top:20px; border-top:2px solid #e2e8f0; color:#94a3b8; font-size:10pt;">
+    <p>Document prepared for review — No code has been built yet.</p>
+    <p>Review each workflow and indicate which to implement and in what order.</p>
+    <p style="margin-top:8px;">Prepared by Bluesprings AI · Cyber Towers Vehicle Access Dashboard · June 2026</p>
+  </div>
+
+</div>
+</body>
+</html>
