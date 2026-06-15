@@ -90,9 +90,10 @@ function saveCompanies(list) {
   }
 }
 
-function PersonPhoto({ cardId, name }) {
+function PersonPhoto({ cardId, name, size = 'md' }) {
   const [failed, setFailed] = useState(false);
   const url = getPersonPhotoUrl(cardId);
+  const dim = size === 'lg' ? 'w-14 h-14 text-base' : size === 'xl' ? 'w-20 h-20 text-xl' : 'w-10 h-10 text-xs';
 
   if (!url || failed) {
     const initials = (name || '?')
@@ -102,7 +103,7 @@ function PersonPhoto({ cardId, name }) {
       .slice(0, 2)
       .toUpperCase();
     return (
-      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500 dark:text-slate-300 shrink-0">
+      <div className={`${dim} rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 dark:text-slate-300 shrink-0`}>
         {initials}
       </div>
     );
@@ -114,7 +115,7 @@ function PersonPhoto({ cardId, name }) {
       alt={name || 'photo'}
       loading="lazy"
       onError={() => setFailed(true)}
-      className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+      className={`${dim} rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0`}
     />
   );
 }
@@ -123,7 +124,11 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
   const [registryState, setRegistryState] = useState(() => loadRegisteredVehiclesState());
   const [parkingAllocations, setParkingAllocations] = useState(() => loadParkingAllocations());
   const [companies, setCompanies] = useState(() => loadCompanies());
+  const [activeTab, setActiveTab] = useState('vehicles');
+  const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [selectedCompany, setSelectedCompany] = useState(null);
   const [search, setSearch] = useState('');
+  const [companySearch, setCompanySearch] = useState('');
   const [filterCompany, setFilterCompany] = useState('');
   const [filterVehicleType, setFilterVehicleType] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -324,6 +329,30 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
     }
     return opts.sort();
   }, [vehicles]);
+
+  const allCompanies = useMemo(() => {
+    const countMap = new Map();
+    for (const v of vehicles) {
+      const name = getCompanyName(v.Addr);
+      if (name && name !== '-') {
+        countMap.set(name, (countMap.get(name) || 0) + 1);
+      }
+    }
+    const registered = companies.map((c) => ({
+      ...c,
+      displayName: c.companyName,
+      vehicleCount: countMap.get(c.companyName) || 0,
+      fromRegistry: true,
+    }));
+    const registeredNames = new Set(companies.map((c) => c.companyName));
+    const derived = [];
+    for (const [name, count] of countMap) {
+      if (!registeredNames.has(name)) {
+        derived.push({ displayName: name, vehicleCount: count, fromRegistry: false });
+      }
+    }
+    return [...registered, ...derived].sort((a, b) => b.vehicleCount - a.vehicleCount);
+  }, [vehicles, companies]);
 
   function upsertParkingForCard(vehicle, slotValue) {
     const key = cardKey(vehicle.CardData);
@@ -556,121 +585,177 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
           </div>
         </section>
 
+        {/* ── Registry panel ──────────────────────────────── */}
         <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-          <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+
+          {/* Header row */}
+          <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
             <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Vehicle Registry Configuration</p>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => { setCompanyForm(createEmptyCompanyForm()); setCompanyModalOpen(true); }}
-                className="rounded-lg bg-violet-500 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-600"
-              >
-                Company Registration
-              </button>
-              <button type="button" onClick={openAddModal} className="rounded-lg bg-sky-500 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-600">
-                Add User
-              </button>
+              <button type="button" onClick={() => { setCompanyForm(createEmptyCompanyForm()); setCompanyModalOpen(true); }} className="rounded-lg bg-violet-500 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-600">Company Registration</button>
+              <button type="button" onClick={openAddModal} className="rounded-lg bg-sky-500 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-600">Add User</button>
             </div>
           </div>
 
-          {/* Search + Filters */}
-          <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-2">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name, card, vehicle number…"
-              className="w-full md:w-72 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm"
-            />
-            <select
-              value={filterCompany}
-              onChange={(e) => setFilterCompany(e.target.value)}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-700 dark:text-slate-200"
-            >
-              <option value="">All Companies</option>
-              {companyOptions.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-            <select
-              value={filterVehicleType}
-              onChange={(e) => setFilterVehicleType(e.target.value)}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-700 dark:text-slate-200"
-            >
-              <option value="">All Vehicle Types</option>
-              <option value="2W">Two-Wheeler</option>
-              <option value="4W">Four-Wheeler</option>
-              <option value="other">Other / Unknown</option>
-            </select>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-700 dark:text-slate-200"
-            >
-              <option value="">All Statuses</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-            {(filterCompany || filterVehicleType || filterStatus || search) && (
+          {/* Tab switcher */}
+          <div className="flex border-b border-slate-200 dark:border-slate-800 px-4 gap-1 pt-2">
+            {[{ key: 'vehicles', label: `Vehicles (${vehicles.length})` }, { key: 'companies', label: `Companies (${allCompanies.length})` }].map(({ key, label }) => (
               <button
+                key={key}
                 type="button"
-                onClick={() => { setSearch(''); setFilterCompany(''); setFilterVehicleType(''); setFilterStatus(''); }}
-                className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                onClick={() => setActiveTab(key)}
+                className={`px-4 py-2 text-sm font-semibold rounded-t-lg transition-colors ${activeTab === key ? 'border-b-2 border-sky-500 text-sky-600 dark:text-sky-400' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
               >
-                Clear filters
+                {label}
               </button>
-            )}
-            <span className="ml-auto text-xs text-slate-400 dark:text-slate-500 shrink-0">
-              {filteredVehicles.length} of {vehicles.length} records
-            </span>
+            ))}
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800">
-                  {['Photo', 'Card ID', 'Name', 'Vehicle No.', 'Company', 'Vehicle Type', 'Blood Group', 'Status', 'Actions'].map((h) => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filteredVehicles.length === 0 ? (
-                  <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400">No vehicles found.</td></tr>
-                ) : (
-                  filteredVehicles.map((vehicle) => (
-                    <tr key={vehicle.CardData} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="px-4 py-3">
-                        <PersonPhoto cardId={vehicle.CardData} name={vehicle.CarNumber || vehicle.PName} />
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-300">{vehicle.CardData}</td>
-                      <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">{vehicle.CarNumber || '-'}</td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{vehicle.PName || '-'}</td>
-                      <td className="px-4 py-3 text-xs text-slate-700 dark:text-slate-300">{getCompanyName(vehicle.Addr)}</td>
-                      <td className="px-4 py-3">
-                        {vehicle.vehicleType && vehicle.vehicleType !== '-' ? (
-                          <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${normalize(vehicle.vehicleType).toUpperCase().startsWith('2') ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' : normalize(vehicle.vehicleType).toUpperCase().startsWith('4') ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>
-                            {vehicle.vehicleType}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-slate-400 dark:text-slate-500">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-700 dark:text-slate-300">{vehicle.BloodGroup || '-'}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${authBadgeClass(vehicle.Authorization)}`}>
-                          {vehicle.Authorization || 'Active'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button type="button" onClick={() => openEditModal(vehicle)} className="rounded-md bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200 px-2.5 py-1 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-600">Edit</button>
-                      </td>
-                    </tr>
-                  ))
+          {/* ── VEHICLES TAB ── */}
+          {activeTab === 'vehicles' && (
+            <>
+              {/* Filters */}
+              <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-2">
+                <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, card, vehicle number…" className="w-full md:w-64 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm" />
+                <select value={filterCompany} onChange={(e) => setFilterCompany(e.target.value)} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-700 dark:text-slate-200">
+                  <option value="">All Companies</option>
+                  {companyOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <select value={filterVehicleType} onChange={(e) => setFilterVehicleType(e.target.value)} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-700 dark:text-slate-200">
+                  <option value="">All Types</option>
+                  <option value="2W">Two-Wheeler</option>
+                  <option value="4W">Four-Wheeler</option>
+                  <option value="other">Other</option>
+                </select>
+                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-700 dark:text-slate-200">
+                  <option value="">All Statuses</option>
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+                {(filterCompany || filterVehicleType || filterStatus || search) && (
+                  <button type="button" onClick={() => { setSearch(''); setFilterCompany(''); setFilterVehicleType(''); setFilterStatus(''); }} className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white">Clear</button>
                 )}
-              </tbody>
-            </table>
-          </div>
+                <span className="ml-auto text-xs text-slate-400 dark:text-slate-500 shrink-0">{filteredVehicles.length} of {vehicles.length}</span>
+              </div>
+
+              {/* Card grid */}
+              {filteredVehicles.length === 0 ? (
+                <p className="text-center text-slate-400 py-16">No vehicles found.</p>
+              ) : (
+                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {filteredVehicles.map((vehicle) => {
+                    const name = vehicle.CarNumber || '-';
+                    const vehicleNo = vehicle.PName || '-';
+                    const company = getCompanyName(vehicle.Addr);
+                    const vt = normalize(vehicle.vehicleType).toUpperCase();
+                    const vtColor = vt.startsWith('2') ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' : vt.startsWith('4') ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400';
+                    return (
+                      <div
+                        key={vehicle.CardData}
+                        onClick={() => setSelectedVehicle(vehicle)}
+                        className="group relative rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 flex flex-col gap-3 cursor-pointer hover:shadow-md hover:border-sky-300 dark:hover:border-sky-600 transition-all"
+                      >
+                        {/* Top: photo + name + status */}
+                        <div className="flex items-center gap-3">
+                          <PersonPhoto cardId={vehicle.CardData} name={name} size="lg" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-slate-900 dark:text-white truncate">{name}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono truncate">{vehicle.CardData}</p>
+                          </div>
+                          <span className={`shrink-0 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${authBadgeClass(vehicle.Authorization)}`}>
+                            {vehicle.Authorization || 'Active'}
+                          </span>
+                        </div>
+
+                        {/* Details */}
+                        <div className="space-y-1.5 text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-400 w-20 shrink-0">Vehicle No.</span>
+                            <span className="font-medium text-slate-700 dark:text-slate-200 truncate">{vehicleNo}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-400 w-20 shrink-0">Company</span>
+                            <span className="text-slate-600 dark:text-slate-300 truncate text-xs">{company}</span>
+                          </div>
+                          {vehicle.BloodGroup && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-400 w-20 shrink-0">Blood Group</span>
+                              <span className="text-slate-600 dark:text-slate-300 text-xs">{vehicle.BloodGroup}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Bottom: vehicle type + edit */}
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-700">
+                          {vehicle.vehicleType && vehicle.vehicleType !== '-' ? (
+                            <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-semibold ${vtColor}`}>{vehicle.vehicleType}</span>
+                          ) : (
+                            <span className="text-xs text-slate-300 dark:text-slate-600">No type</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); openEditModal(vehicle); }}
+                            className="rounded-md bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2.5 py-1 text-xs font-semibold hover:bg-sky-100 hover:text-sky-700 dark:hover:bg-sky-900/40 dark:hover:text-sky-300 transition-colors"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── COMPANIES TAB ── */}
+          {activeTab === 'companies' && (
+            <>
+              <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-2">
+                <input type="text" value={companySearch} onChange={(e) => setCompanySearch(e.target.value)} placeholder="Search companies…" className="w-full md:w-64 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm" />
+                <span className="ml-auto text-xs text-slate-400 dark:text-slate-500">{allCompanies.length} companies</span>
+              </div>
+              {allCompanies.filter(c => !companySearch || c.displayName.toLowerCase().includes(companySearch.toLowerCase())).length === 0 ? (
+                <p className="text-center text-slate-400 py-16">No companies found.</p>
+              ) : (
+                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {allCompanies
+                    .filter(c => !companySearch || c.displayName.toLowerCase().includes(companySearch.toLowerCase()))
+                    .map((c, i) => {
+                      const initial = c.displayName[0]?.toUpperCase() || '?';
+                      const colors = ['bg-sky-500','bg-violet-500','bg-emerald-500','bg-orange-500','bg-rose-500','bg-indigo-500','bg-teal-500','bg-amber-500'];
+                      const color = colors[i % colors.length];
+                      return (
+                        <div
+                          key={c.displayName}
+                          onClick={() => setSelectedCompany(c)}
+                          className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 flex flex-col gap-3 cursor-pointer hover:shadow-md hover:border-sky-300 dark:hover:border-sky-600 transition-all"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-11 h-11 rounded-xl ${color} flex items-center justify-center text-white font-bold text-lg shrink-0`}>{initial}</div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-slate-900 dark:text-white truncate">{c.displayName}</p>
+                              {c.fromRegistry && c.blockOrQuadrant && <p className="text-xs text-slate-400 truncate">{c.blockOrQuadrant}</p>}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-700">
+                            <span><span className="font-bold text-slate-700 dark:text-slate-200">{c.vehicleCount}</span> vehicle{c.vehicleCount !== 1 ? 's' : ''}</span>
+                            {c.fromRegistry ? (
+                              <span className="inline-flex rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold">Registered</span>
+                            ) : (
+                              <span className="inline-flex rounded-full bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400 px-2 py-0.5 text-xs font-semibold">Auto-detected</span>
+                            )}
+                          </div>
+                          {c.fromRegistry && c.parkingSlots && (
+                            <p className="text-xs text-slate-400">Parking slots: {c.parkingSlots}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </>
+          )}
         </section>
       </main>
 
@@ -874,6 +959,127 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
           </div>
         </div>
       )}
+
+      {/* ── Vehicle Detail Drawer ───────────────────────── */}
+      {selectedVehicle && (
+        <div className="fixed inset-0 z-50 flex" onClick={() => setSelectedVehicle(null)}>
+          <div className="flex-1 bg-slate-950/50" />
+          <div
+            className="w-full max-w-md bg-white dark:bg-slate-900 h-full overflow-y-auto shadow-2xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drawer header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+              <h3 className="font-bold text-slate-900 dark:text-white text-lg">Employee Details</h3>
+              <button type="button" onClick={() => setSelectedVehicle(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white text-2xl leading-none font-bold">&times;</button>
+            </div>
+
+            {/* Photo + name hero */}
+            <div className="flex flex-col items-center gap-3 px-5 py-8 bg-gradient-to-b from-sky-50 dark:from-sky-950/30 to-transparent">
+              <PersonPhoto cardId={selectedVehicle.CardData} name={selectedVehicle.CarNumber || selectedVehicle.PName} size="xl" />
+              <div className="text-center">
+                <p className="text-xl font-bold text-slate-900 dark:text-white">{selectedVehicle.CarNumber || '-'}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 font-mono mt-0.5">Card: {selectedVehicle.CardData}</p>
+              </div>
+              <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${authBadgeClass(selectedVehicle.Authorization)}`}>
+                {selectedVehicle.Authorization || 'Active'}
+              </span>
+            </div>
+
+            {/* Detail fields */}
+            <div className="px-5 pb-6 flex flex-col gap-4">
+              {[
+                { label: 'Vehicle Number', value: selectedVehicle.PName },
+                { label: 'Company', value: getCompanyName(selectedVehicle.Addr) },
+                { label: 'Vehicle Type', value: selectedVehicle.vehicleType },
+                { label: 'Blood Group', value: selectedVehicle.BloodGroup },
+                { label: 'Card ID', value: selectedVehicle.CardData },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex flex-col gap-0.5">
+                  <span className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">{label}</span>
+                  <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{value || '-'}</span>
+                </div>
+              ))}
+
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => { setSelectedVehicle(null); openEditModal(selectedVehicle); }}
+                  className="w-full rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-semibold py-2.5 text-sm transition-colors"
+                >
+                  Edit This Record
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Company Detail Modal ────────────────────────── */}
+      {selectedCompany && (() => {
+        const companyName = selectedCompany.displayName;
+        const companyVehicles = vehicles.filter(v => getCompanyName(v.Addr) === companyName);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" onClick={() => setSelectedCompany(null)}>
+            <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              {/* Modal header */}
+              <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-sky-500 flex items-center justify-center text-white font-bold text-lg shrink-0">
+                    {companyName[0]?.toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-lg leading-tight">{companyName}</h3>
+                    <p className="text-xs text-slate-400">{companyVehicles.length} registered vehicle{companyVehicles.length !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+                <button type="button" onClick={() => setSelectedCompany(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white text-2xl leading-none font-bold">&times;</button>
+              </div>
+
+              {/* Company meta */}
+              {selectedCompany.fromRegistry && (
+                <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-700 grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                  {selectedCompany.blockOrQuadrant && <div><p className="text-xs text-slate-400">Block / Quadrant</p><p className="font-medium text-slate-700 dark:text-slate-200">{selectedCompany.blockOrQuadrant}</p></div>}
+                  {selectedCompany.parkingSlots && <div><p className="text-xs text-slate-400">Parking Slots</p><p className="font-medium text-slate-700 dark:text-slate-200">{selectedCompany.parkingSlots}</p></div>}
+                  {selectedCompany.adminName && <div><p className="text-xs text-slate-400">Admin</p><p className="font-medium text-slate-700 dark:text-slate-200">{selectedCompany.adminName}</p></div>}
+                  {selectedCompany.adminEmail && <div><p className="text-xs text-slate-400">Email</p><p className="font-medium text-slate-700 dark:text-slate-200 text-xs break-all">{selectedCompany.adminEmail}</p></div>}
+                  {selectedCompany.phoneNumber && <div><p className="text-xs text-slate-400">Phone</p><p className="font-medium text-slate-700 dark:text-slate-200">{selectedCompany.phoneNumber}</p></div>}
+                </div>
+              )}
+
+              {/* Employees list */}
+              <div className="flex-1 overflow-y-auto px-5 py-4">
+                <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Registered Employees</p>
+                {companyVehicles.length === 0 ? (
+                  <p className="text-slate-400 text-sm text-center py-8">No vehicles linked to this company yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {companyVehicles.map((v) => (
+                      <div
+                        key={v.CardData}
+                        className="flex items-center gap-3 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-3 cursor-pointer hover:border-sky-300 dark:hover:border-sky-600 transition-colors"
+                        onClick={() => { setSelectedCompany(null); setSelectedVehicle(v); }}
+                      >
+                        <PersonPhoto cardId={v.CardData} name={v.CarNumber || v.PName} size="md" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{v.CarNumber || '-'}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{v.PName || '-'} · Card {v.CardData}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {v.vehicleType && v.vehicleType !== '-' && (
+                            <span className={`inline-flex rounded-md px-2 py-0.5 text-xs font-semibold ${normalize(v.vehicleType).toUpperCase().startsWith('2') ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' : 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300'}`}>{v.vehicleType}</span>
+                          )}
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${authBadgeClass(v.Authorization)}`}>{v.Authorization || 'Active'}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
