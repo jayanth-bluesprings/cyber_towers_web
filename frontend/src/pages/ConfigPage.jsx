@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Navbar from '../components/Navbar.jsx';
-import { fetchAuthorizedVehicles, WS_URL } from '../api/index.js';
+import { fetchAuthorizedVehicles, getPersonPhotoUrl, updatePerson, WS_URL } from '../api/index.js';
 import { loadParkingAllocations, saveParkingAllocations } from '../utils/parkingStorage.js';
 import { loadRegisteredVehiclesState, saveRegisteredVehiclesState } from '../utils/registeredVehiclesStorage.js';
 
@@ -90,11 +90,43 @@ function saveCompanies(list) {
   }
 }
 
+function PersonPhoto({ cardId, name }) {
+  const [failed, setFailed] = useState(false);
+  const url = getPersonPhotoUrl(cardId);
+
+  if (!url || failed) {
+    const initials = (name || '?')
+      .split(' ')
+      .map((w) => w[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+    return (
+      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500 dark:text-slate-300 shrink-0">
+        {initials}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={url}
+      alt={name || 'photo'}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+    />
+  );
+}
+
 export default function ConfigPage({ dark, setDark, onNavigate, onLogout, activePage = 'config', role = 'admin' }) {
   const [registryState, setRegistryState] = useState(() => loadRegisteredVehiclesState());
   const [parkingAllocations, setParkingAllocations] = useState(() => loadParkingAllocations());
   const [companies, setCompanies] = useState(() => loadCompanies());
   const [search, setSearch] = useState('');
+  const [filterCompany, setFilterCompany] = useState('');
+  const [filterVehicleType, setFilterVehicleType] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [latestScannedCard, setLatestScannedCard] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('add');
@@ -102,6 +134,8 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
   const [form, setForm] = useState(createEmptyForm());
   const [companyModalOpen, setCompanyModalOpen] = useState(false);
   const [companyForm, setCompanyForm] = useState(createEmptyCompanyForm());
+  const [saveStatus, setSaveStatus] = useState(null); // null | 'saving' | 'db-ok' | 'local-only' | 'error'
+  const queryClient = useQueryClient();
   const scanWsRef = useRef(null);
   const scanReconnectRef = useRef(null);
 
@@ -223,23 +257,44 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
   }, [apiVehicles, registryState]);
 
   const filteredVehicles = useMemo(() => {
+    let list = vehicles;
+
+    if (filterCompany) {
+      list = list.filter((v) => getCompanyName(v.Addr) === filterCompany);
+    }
+    if (filterVehicleType) {
+      list = list.filter((v) => {
+        const vt = normalize(v.vehicleType).toUpperCase();
+        if (filterVehicleType === '2W') return vt.startsWith('2');
+        if (filterVehicleType === '4W') return vt.startsWith('4');
+        return !vt.startsWith('2') && !vt.startsWith('4');
+      });
+    }
+    if (filterStatus) {
+      list = list.filter((v) => {
+        const auth = normalize(v.Authorization);
+        if (filterStatus === 'Active') return auth !== 'Inactive' && auth !== 'Unauthorized';
+        return auth === 'Inactive' || auth === 'Unauthorized';
+      });
+    }
+
     const term = search.trim().toLowerCase();
-    if (!term) return vehicles;
-    return vehicles.filter((vehicle) =>
+    if (!term) return list;
+    return list.filter((vehicle) =>
       [
         vehicle.CardData,
         vehicle.PName,
         vehicle.CarNumber,
         vehicle.Addr,
+        getCompanyName(vehicle.Addr),
         vehicle.vehicleType,
         vehicle.BloodGroup,
         vehicle.Authorization,
-        parkingByCardId.get(cardKey(vehicle.CardData)) || '',
       ]
         .map((value) => normalize(value).toLowerCase())
         .some((value) => value.includes(term))
     );
-  }, [search, vehicles, parkingByCardId]);
+  }, [search, filterCompany, filterVehicleType, filterStatus, vehicles]);
 
   const configStats = useMemo(() => {
     const total = vehicles.length;
@@ -256,6 +311,19 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
 
     return { total, active, inactive, withParking, withoutParking, twoW, fourW, custom };
   }, [vehicles, parkingByCardId, registryState.customVehicles]);
+
+  const companyOptions = useMemo(() => {
+    const seen = new Set();
+    const opts = [];
+    for (const v of vehicles) {
+      const name = getCompanyName(v.Addr);
+      if (name && name !== '-' && !seen.has(name)) {
+        seen.add(name);
+        opts.push(name);
+      }
+    }
+    return opts.sort();
+  }, [vehicles]);
 
   function upsertParkingForCard(vehicle, slotValue) {
     const key = cardKey(vehicle.CardData);
@@ -322,7 +390,7 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
     setEditingCardId('');
   }
 
-  function handleSaveVehicle(event) {
+  async function handleSaveVehicle(event) {
     event.preventDefault();
     const nextCardId = cardKey(form.CardData);
     if (!nextCardId) {
@@ -340,6 +408,7 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
       Authorization: normalize(form.Authorization) || 'Active',
     };
 
+    // ── ADD mode: local-only (creating new Personnel rows is out of scope) ──
     if (modalMode === 'add') {
       const exists = vehicles.some((vehicle) => cardKey(vehicle.CardData) === nextCardId);
       if (exists) {
@@ -348,7 +417,6 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
       }
       const ok = upsertParkingForCard(payload, form.ParkingSpace);
       if (!ok) return;
-
       setRegistryState((prev) => ({
         ...prev,
         customVehicles: [...(prev.customVehicles || []), payload],
@@ -358,36 +426,64 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
       return;
     }
 
+    // ── EDIT mode: try DB first, fall back to localStorage ──
     const targetKey = editingCardId || nextCardId;
     const isCustom = (registryState.customVehicles || []).some((row) => cardKey(row.CardData) === targetKey);
     const ok = upsertParkingForCard(payload, form.ParkingSpace);
     if (!ok) return;
 
-    if (isCustom) {
-      setRegistryState((prev) => ({
-        ...prev,
-        customVehicles: (prev.customVehicles || []).map((row) =>
-          cardKey(row.CardData) === targetKey ? { ...row, ...payload } : row
-        ),
-      }));
-    } else {
-      setRegistryState((prev) => ({
-        ...prev,
-        editsByCardId: {
-          ...(prev.editsByCardId || {}),
-          [targetKey]: {
-            PName: payload.PName,
-            CarNumber: payload.CarNumber,
-            Addr: payload.Addr,
-            vehicleType: payload.vehicleType,
-            BloodGroup: payload.BloodGroup,
-            Authorization: payload.Authorization,
+    function applyLocalEdit() {
+      if (isCustom) {
+        setRegistryState((prev) => ({
+          ...prev,
+          customVehicles: (prev.customVehicles || []).map((row) =>
+            cardKey(row.CardData) === targetKey ? { ...row, ...payload } : row
+          ),
+        }));
+      } else {
+        setRegistryState((prev) => ({
+          ...prev,
+          editsByCardId: {
+            ...(prev.editsByCardId || {}),
+            [targetKey]: {
+              PName: payload.PName,
+              CarNumber: payload.CarNumber,
+              Addr: payload.Addr,
+              vehicleType: payload.vehicleType,
+              BloodGroup: payload.BloodGroup,
+              Authorization: payload.Authorization,
+            },
           },
-        },
-      }));
+        }));
+      }
     }
 
-    closeModal();
+    if (!isCustom) {
+      // DB-first for Personnel records
+      setSaveStatus('saving');
+      closeModal();
+      try {
+        await updatePerson(payload.CardData, {
+          PName: payload.PName,
+          CarNumber: payload.CarNumber,
+          Addr: payload.Addr,
+          vehicleType: payload.vehicleType,
+          BloodGroup: payload.BloodGroup,
+        });
+        applyLocalEdit();
+        setSaveStatus('db-ok');
+        queryClient.invalidateQueries({ queryKey: ['authorizedVehicles'] });
+      } catch (err) {
+        console.warn('[ConfigPage] DB update failed, saving locally:', err.message);
+        applyLocalEdit();
+        setSaveStatus('local-only');
+      }
+      setTimeout(() => setSaveStatus(null), 4000);
+    } else {
+      // Custom vehicles only exist locally
+      applyLocalEdit();
+      closeModal();
+    }
   }
 
   function handleSaveCompany(event) {
@@ -411,6 +507,22 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
       <Navbar dark={dark} setDark={setDark} activePage={activePage} onNavigate={onNavigate} onLogout={onLogout} role={role} />
 
       <main className="flex-1 max-w-screen-2xl mx-auto w-full px-4 py-5 flex flex-col gap-6">
+
+        {/* Save status toast */}
+        {saveStatus && (
+          <div className={`fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold shadow-lg transition-all
+            ${saveStatus === 'saving'    ? 'bg-slate-700 text-white' : ''}
+            ${saveStatus === 'db-ok'     ? 'bg-emerald-600 text-white' : ''}
+            ${saveStatus === 'local-only'? 'bg-amber-500 text-white' : ''}
+            ${saveStatus === 'error'     ? 'bg-rose-600 text-white' : ''}
+          `}>
+            {saveStatus === 'saving'     && <><span className="animate-spin">⟳</span> Saving to database…</>}
+            {saveStatus === 'db-ok'      && <>✓ Saved to TimeWatch database</>}
+            {saveStatus === 'local-only' && <>⚠ DB unreachable — saved locally only</>}
+            {saveStatus === 'error'      && <>✕ Save failed</>}
+          </div>
+        )}
+
         <div>
           <h2 className="font-display font-bold text-xl tracking-tight text-slate-900 dark:text-white">Configuration</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
@@ -461,54 +573,97 @@ export default function ConfigPage({ dark, setDark, onNavigate, onLogout, active
             </div>
           </div>
 
-          <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+          {/* Search + Filters */}
+          <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center gap-2">
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search vehicles, parking slot, status"
-              className="w-full md:w-96 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm"
+              placeholder="Search name, card, vehicle number…"
+              className="w-full md:w-72 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm"
             />
+            <select
+              value={filterCompany}
+              onChange={(e) => setFilterCompany(e.target.value)}
+              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-700 dark:text-slate-200"
+            >
+              <option value="">All Companies</option>
+              {companyOptions.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            <select
+              value={filterVehicleType}
+              onChange={(e) => setFilterVehicleType(e.target.value)}
+              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-700 dark:text-slate-200"
+            >
+              <option value="">All Vehicle Types</option>
+              <option value="2W">Two-Wheeler</option>
+              <option value="4W">Four-Wheeler</option>
+              <option value="other">Other / Unknown</option>
+            </select>
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 px-3 py-2 text-sm text-slate-700 dark:text-slate-200"
+            >
+              <option value="">All Statuses</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+            {(filterCompany || filterVehicleType || filterStatus || search) && (
+              <button
+                type="button"
+                onClick={() => { setSearch(''); setFilterCompany(''); setFilterVehicleType(''); setFilterStatus(''); }}
+                className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white"
+              >
+                Clear filters
+              </button>
+            )}
+            <span className="ml-auto text-xs text-slate-400 dark:text-slate-500 shrink-0">
+              {filteredVehicles.length} of {vehicles.length} records
+            </span>
           </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800">
-                  {['Card ID', 'Vehicle No.', 'Company', 'Vehicle Type', 'Blood Group', 'Status', 'Parking Quota', 'Actions'].map((h) => (
+                  {['Photo', 'Card ID', 'Name', 'Vehicle No.', 'Company', 'Vehicle Type', 'Blood Group', 'Status', 'Actions'].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredVehicles.length === 0 ? (
-                  <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-400">No vehicles found.</td></tr>
+                  <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400">No vehicles found.</td></tr>
                 ) : (
                   filteredVehicles.map((vehicle) => (
                     <tr key={vehicle.CardData} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="px-4 py-3 font-mono text-xs">{vehicle.CardData}</td>
-                      <td className="px-4 py-3">{vehicle.CarNumber || vehicle.PName || '-'}</td>
+                      <td className="px-4 py-3">
+                        <PersonPhoto cardId={vehicle.CardData} name={vehicle.CarNumber || vehicle.PName} />
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-slate-600 dark:text-slate-300">{vehicle.CardData}</td>
+                      <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">{vehicle.CarNumber || '-'}</td>
+                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{vehicle.PName || '-'}</td>
                       <td className="px-4 py-3 text-xs text-slate-700 dark:text-slate-300">{getCompanyName(vehicle.Addr)}</td>
-                      <td className="px-4 py-3">{vehicle.vehicleType || '-'}</td>
-                      <td className="px-4 py-3">{vehicle.BloodGroup || '-'}</td>
+                      <td className="px-4 py-3">
+                        {vehicle.vehicleType && vehicle.vehicleType !== '-' ? (
+                          <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${normalize(vehicle.vehicleType).toUpperCase().startsWith('2') ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' : normalize(vehicle.vehicleType).toUpperCase().startsWith('4') ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+                            {vehicle.vehicleType}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400 dark:text-slate-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-700 dark:text-slate-300">{vehicle.BloodGroup || '-'}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${authBadgeClass(vehicle.Authorization)}`}>
                           {vehicle.Authorization || 'Active'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        {(() => {
-                          const slot = getSlotLabel(parkingByCardId.get(cardKey(vehicle.CardData)));
-                          return slot ? (
-                            <span className="inline-flex rounded-md px-2 py-1 text-xs font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
-                              {slot}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-slate-400 dark:text-slate-500">No Slot</span>
-                          );
-                        })()}
-                      </td>
-                      <td className="px-4 py-3">
-                        <button type="button" onClick={() => openEditModal(vehicle)} className="rounded-md bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200 px-2.5 py-1 text-xs font-semibold">Edit</button>
+                        <button type="button" onClick={() => openEditModal(vehicle)} className="rounded-md bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200 px-2.5 py-1 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-600">Edit</button>
                       </td>
                     </tr>
                   ))

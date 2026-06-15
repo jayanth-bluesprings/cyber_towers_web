@@ -63,4 +63,9 @@ function enrichWithCache(record, personnelMap) {
   };
 }
 
-module.exports = { getPersonnelMap, enrichWithCache };
+function invalidatePersonnelCache() {
+  cache.personnel = new Map();
+  cache.lastUpdated = 0;
+}
+
+module.exports = { getPersonnelMap, enrichWithCache, invalidatePersonnelCache };

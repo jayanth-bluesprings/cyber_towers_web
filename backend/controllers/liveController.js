@@ -110,30 +110,32 @@ async function search(req, res) {
 
 async function getAuthorizedVehicles(req, res) {
   try {
-    const personnelMap = await getPersonnelMap();
-
-    // Query unique card holders from CardRecord — this table always has real data
-    // because every scan is recorded here. We group by CardData to get one row
-    // per unique card, taking the most recent PName and PCode for each.
     const result = await query(`
       SET NOCOUNT ON;
-      SELECT TOP 3000
-        CardData,
-        MAX(PName)        AS PName,
-        MAX(PCode)        AS PCode,
-        MAX(DeptName)     AS DeptName,
-        MAX(PersonnelID)  AS PersonnelID
-      FROM CardRecord WITH (NOLOCK)
-      WHERE CardData IS NOT NULL
-        AND CardData != ''
-        AND CardData != '0'
-      GROUP BY CardData
-      ORDER BY MAX(CardRecordID) DESC
+      SELECT
+        p.PersonnelID,
+        p.CardData,
+        p.PName,
+        p.PCode,
+        p.Addr,
+        pe2.CarNumber,
+        p.PDesc        AS Remark,
+        p.graduateSchool AS BloodGroup
+      FROM Personnel p WITH (NOLOCK)
+      LEFT JOIN PersonnelExtend2 pe2 WITH (NOLOCK) ON pe2.PersonnelID = p.PersonnelID
+      WHERE p.CardData IS NOT NULL
+        AND p.CardData != ''
+        AND p.CardData != '0'
+      ORDER BY p.PersonnelID DESC
     `);
 
-    // enrichWithCache adds CarNumber, BloodGroup, vehicleType, Addr from the
-    // Personnel / PersonnelExtend2 tables where that data exists.
-    const records = result.recordset.map(r => enrichWithCache(r, personnelMap));
+    const records = result.recordset.map(r => {
+      const rawType = (r.Remark || '').toString().trim();
+      const upper = rawType.toUpperCase();
+      const vehicleType = upper.startsWith('2') ? '2W' : upper.startsWith('4') ? '4W' : rawType || '-';
+      return { ...r, vehicleType };
+    });
+
     res.json({ success: true, data: records });
   } catch (err) {
     console.error('getAuthorizedVehicles error:', err.message);

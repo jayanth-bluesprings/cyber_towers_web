@@ -5,9 +5,9 @@ import { loadLocalAccessApprovals } from '../utils/localAccessApprovalsStorage.j
 
 function defaultDateRange() {
   const today = new Date();
-  const d30 = new Date(today);
-  d30.setDate(today.getDate() - 29);
-  return { from: formatInputDate(d30), to: formatInputDate(today) };
+  const d180 = new Date(today);
+  d180.setDate(today.getDate() - 179);
+  return { from: formatInputDate(d180), to: formatInputDate(today) };
 }
 
 const DEFAULT_FILTERS = { from: '', to: '', type: '', search: '', status: '', authorization: '' };

@@ -50,6 +50,22 @@ export function fetchAuthorizedVehicles() {
   return apiFetch('/api/authorized-vehicles');
 }
 
+export function getPersonPhotoUrl(cardId) {
+  if (!cardId) return null;
+  return `${BASE_URL}/api/person-photo/${encodeURIComponent(cardId)}`;
+}
+
+export async function updatePerson(cardId, data) {
+  const res = await fetch(`${BASE_URL}/api/person/${encodeURIComponent(cardId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...buildHeaders() },
+    body: JSON.stringify(data),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+  return json;
+}
+
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
 export function fetchVehicleStats(period = 'day') {

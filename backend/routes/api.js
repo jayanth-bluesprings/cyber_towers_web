@@ -4,6 +4,8 @@ const { getLive, getNew, search, getAuthorizedVehicles } = require('../controlle
 const { getVehicleStats, getVehicleTypeCount, getVehicleCount, getEventCounts } = require('../controllers/statsController');
 const { getDebug, getReportSummary, getReportRecords, getVehicleOccupancy, trigger24hAlert } = require('../controllers/reportcontroller');
 const { sendSecurityDecision, deriveWf3WorkflowId } = require('../temporalClient');
+const { getPersonPhoto, getPhotoSchema } = require('../controllers/photoController');
+const { updatePerson } = require('../controllers/personController');
 
 router.get('/live', getLive);
 router.get('/new', getNew);
@@ -18,6 +20,9 @@ router.get('/report/records', getReportRecords);
 router.get('/report/occupancy', getVehicleOccupancy);
 router.get('/alerts/trigger-24h', trigger24hAlert);
 router.get('/health/events', getEventCounts);
+router.get('/person-photo/:cardId', getPersonPhoto);
+router.get('/photo-schema', getPhotoSchema);
+router.put('/person/:cardId', updatePerson);
 
 // ── Security decision for unauthorized vehicle approval ──────
 // Called by the Allow button in Live Entry/Exit.
