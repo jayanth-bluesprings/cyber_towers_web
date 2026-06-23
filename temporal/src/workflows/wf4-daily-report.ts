@@ -107,14 +107,7 @@ export async function wf4DailyReport(): Promise<void> {
   //    The & is TypeScript for "this type AND that type combined"
   //    So it has ALL fields of DailyReportStats PLUS insideVehicles.
   //
-  const statsWithVehicles = await report.getDailyStats() as
-    DailyReportStats & { insideVehicles: InsideVehicle[] };
-
-  // Pull out the two parts separately for clarity
-  // The { insideVehicles, ...stats } syntax is called "destructuring with rest"
-  // insideVehicles = the array of vehicles still inside
-  // ...stats = everything else from statsWithVehicles (spread into stats)
-  const { insideVehicles, ...stats } = statsWithVehicles;
+  const { stats, vehicles: insideVehicles } = await report.getDailyStats();
 
   // Log what we found — visible in Temporal Web UI and worker console
   console.log(

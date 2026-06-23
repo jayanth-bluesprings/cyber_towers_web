@@ -1,0 +1,6 @@
+card_no,person_name,person_code,department,vehicle_number,vehicle_type,vehicle_brand,vehicle_color,blood_group,card_type,valid_from,valid_until,notes
+1234567890,John Doe,EMP001,TechCorp,TS09AB1234,4W,Honda,White,O+,Normal,2025-01-01,2026-12-31,Permanent employee
+2345678901,Priya Sharma,EMP002,Infosys Ltd,TS10CD5678,2W,Honda Activa,Black,B+,Normal,2025-02-15,2027-02-14,Two wheeler pass
+3456789012,Rahul Verma,EMP003,Google India,TS07EF9012,4W,Toyota,Silver,A+,Normal,2025-03-01,,Senior manager
+4567890123,Anita Reddy,EMP004,Amazon India,TS08GH3456,4W,Maruti,Red,AB-,Normal,2025-01-10,2026-06-30,Contractor
+5678901234,Karthik Iyer,EMP005,Wipro Technologies,TS05IJ7890,2W,Bajaj,Blue,O-,Normal,,,Visitor parking

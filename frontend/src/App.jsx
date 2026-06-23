@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import ReportPage from './pages/Reportpage.jsx';
 import LiveEntryExitPage from './pages/LiveEntryExitPage.jsx';
 import ConfigPage from './pages/ConfigPage.jsx';
+import TagRegistrationPage from './pages/TagRegistrationPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 
 const AUTH_STORAGE_KEY = 'vehicleAccessAuth';
@@ -18,9 +19,9 @@ const USERS = {
 
 // Which pages each role can access
 const ROLE_ACCESS = {
-  security:   ['dashboard', 'live'],
-  supervisor: ['dashboard', 'live', 'report'],
-  admin:      ['dashboard', 'live', 'report', 'config'],
+  security:   ['dashboard', 'live', 'tags'],
+  supervisor: ['dashboard', 'live', 'report', 'tags'],
+  admin:      ['dashboard', 'live', 'report', 'config', 'tags'],
 };
 
 export function canAccess(role, page) {
@@ -49,6 +50,8 @@ export default function App() {
       ? '/report'
       : pageKey === 'config'
         ? '/config'
+      : pageKey === 'tags'
+        ? '/register-tag'
       : pageKey === 'live'
         ? '/live'
         : '/';
@@ -59,6 +62,8 @@ export default function App() {
     ? 'report'
     : location.pathname === '/config'
       ? 'config'
+    : location.pathname === '/register-tag'
+      ? 'tags'
     : location.pathname === '/live'
       ? 'live'
       : 'dashboard';
@@ -102,6 +107,10 @@ export default function App() {
         element={canAccess(role, 'report') ? <ReportPage {...sharedProps} /> : <Navigate to="/" replace />}
       />
       <Route path="/authorized" element={<Navigate to="/config" replace />} />
+      <Route
+        path="/register-tag"
+        element={canAccess(role, 'tags') ? <TagRegistrationPage {...sharedProps} /> : <Navigate to="/" replace />}
+      />
       <Route path="/live" element={<LiveEntryExitPage {...sharedProps} />} />
       <Route
         path="/config"

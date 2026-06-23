@@ -178,8 +178,8 @@ export async function wf2OverstayAlert(
     //  THE BUG IS FIXED. No duplicate alerts. No missed alerts.
     //
     const vehicleExitedDuringWait = await wf.condition(
-      () => vehicleExited,     // "is the vehicle gone yet?"
-      step.waitDuration        // "wait up to this long to find out"
+      () => vehicleExited,                    // "is the vehicle gone yet?"
+      step.waitDuration as any               // "wait up to this long to find out"
     );
 
     // ── VEHICLE EXITED BEFORE THIS ALERT THRESHOLD ───────────

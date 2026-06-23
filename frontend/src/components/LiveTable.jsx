@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchLive, fetchSearch, WS_URL } from '../api/index.js';
+import { fetchLive, fetchSearch, WS_URL, getPersonPhotoUrl } from '../api/index.js';
 import { loadStoredEntryExitRecords, saveStoredEntryExitRecords } from '../utils/entryExitStorage.js';
 import { loadLocalAccessApprovals, saveLocalAccessApprovals } from '../utils/localAccessApprovalsStorage.js';
 import { loadParkingAllocations } from '../utils/parkingStorage.js';
@@ -119,7 +119,7 @@ function csvEscape(value) {
 }
 
 function exportCSV(records, localApprovals = {}, parkingByCardId = new Map()) {
-  const headers = ['Gate', 'Card ID', 'Vehicle Type', 'Company Name', 'Car Number', 'Parking Slot', 'Authorization', 'Scan Time'];
+  const headers = ['Gate', 'Card ID', 'Vehicle Type', 'Brand', 'Color', 'Company Name', 'Car Number', 'Parking Slot', 'Authorization', 'Scan Time'];
   const rows = records.map((r) => {
     const gate = getGateInfo(r.EquptName, r.PortNum);
     const key = getApprovalKey(r);
@@ -130,6 +130,8 @@ function exportCSV(records, localApprovals = {}, parkingByCardId = new Map()) {
       gate.label,
       r.CardData || '',
       r.vehicleType || r.VehicleType || '',
+      r.vehicle_brand || '',
+      r.vehicle_color || '',
       r.flatNumber || r.PCode || '',
       vehicleNo,
       parkingSlot,
@@ -174,6 +176,36 @@ function mergeRecords(existing, incoming, maxLen = 5000) {
   return deduped.slice(0, maxLen);
 }
 
+function LivePersonPhoto({ cardId, name, onClick }) {
+  const [failed, setFailed] = useState(false);
+  const url = getPersonPhotoUrl(cardId);
+
+  if (!url || failed) {
+    const initials = (name || '?')
+      .split(' ')
+      .map((w) => w[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+    return (
+      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 dark:text-slate-300 shrink-0 select-none">
+        {initials}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={url}
+      alt={name || 'photo'}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      onClick={onClick}
+      className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+    />
+  );
+}
+
 export default function LiveTable({ onWsStatus }) {
   const [records, setRecords] = useState(() => loadStoredEntryExitRecords());
   const [localApprovals, setLocalApprovals] = useState(() => loadLocalAccessApprovals());
@@ -182,6 +214,7 @@ export default function LiveTable({ onWsStatus }) {
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [newIds, setNewIds] = useState(new Set());
   const [search, setSearch] = useState('');
+  const [selectedPhotoUrl, setSelectedPhotoUrl] = useState(null);
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
   const [gateTab, setGateTab] = useState('all'); // 'all' | 'gate1' | 'gate2'
@@ -474,8 +507,11 @@ export default function LiveTable({ onWsStatus }) {
           <thead className="sticky top-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-sm z-10">
             <tr className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               <th className="px-4 py-3 text-left whitespace-nowrap">Gate</th>
+              <th className="px-3 py-3 text-left whitespace-nowrap">Photo</th>
               <th className="px-4 py-3 text-left whitespace-nowrap">Card ID</th>
               <th className="px-3 py-3 text-center whitespace-nowrap">Vehicle Type</th>
+              <th className="px-3 py-3 text-left whitespace-nowrap hidden md:table-cell">Brand</th>
+              <th className="px-3 py-3 text-left whitespace-nowrap hidden md:table-cell">Color</th>
               <th className="px-3 py-3 text-left whitespace-nowrap hidden md:table-cell">Company Name</th>
               <th className="px-3 py-3 text-left whitespace-nowrap">Car No.</th>
               <th className="px-3 py-3 text-left whitespace-nowrap">Parking Slot</th>
@@ -488,7 +524,7 @@ export default function LiveTable({ onWsStatus }) {
             {loading ? (
               Array.from({ length: 8 }).map((_, i) => (
                 <tr key={i} className="animate-pulse">
-                  {Array.from({ length: 9 }).map((_, j) => (
+                  {Array.from({ length: 12 }).map((_, j) => (
                     <td key={j} className="px-4 py-3">
                       <div className="h-3.5 bg-slate-100 dark:bg-slate-800 rounded" style={{ width: `${45 + Math.random() * 40}%` }} />
                     </td>
@@ -497,7 +533,7 @@ export default function LiveTable({ onWsStatus }) {
               ))
             ) : displayRecords.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-16 text-center text-slate-400">
+                <td colSpan={12} className="px-4 py-16 text-center text-slate-400">
                   <div className="flex flex-col items-center gap-3 opacity-50">
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -528,6 +564,18 @@ export default function LiveTable({ onWsStatus }) {
                       </span>
                     </td>
 
+                    {/* Photo */}
+                    <td className="px-3 py-3">
+                      <LivePersonPhoto
+                        cardId={record.CardData}
+                        name={record.CarNumber || record.PName}
+                        onClick={() => {
+                          const u = getPersonPhotoUrl(record.CardData);
+                          if (u) setSelectedPhotoUrl(u);
+                        }}
+                      />
+                    </td>
+
                     {/* Card ID */}
                     <td className="px-4 py-3">
                       <span className="font-mono text-xs text-slate-600 dark:text-slate-300">
@@ -538,6 +586,20 @@ export default function LiveTable({ onWsStatus }) {
                     {/* Type */}
                     <td className="px-3 py-3 text-center">
                       <VehicleBadge type={record.vehicleType} />
+                    </td>
+
+                    {/* Brand */}
+                    <td className="px-3 py-3 hidden md:table-cell">
+                      <span className="text-xs text-slate-700 dark:text-slate-300">
+                        {record.vehicle_brand || '-'}
+                      </span>
+                    </td>
+
+                    {/* Color */}
+                    <td className="px-3 py-3 hidden md:table-cell">
+                      <span className="text-xs text-slate-700 dark:text-slate-300">
+                        {record.vehicle_color || '-'}
+                      </span>
                     </td>
 
                     {/* Company Name */}
@@ -713,6 +775,29 @@ export default function LiveTable({ onWsStatus }) {
                 Save & Allow
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {selectedPhotoUrl && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm cursor-pointer"
+          onClick={() => setSelectedPhotoUrl(null)}
+        >
+          <div className="relative max-w-lg max-h-[85vh] rounded-2xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-2 flex flex-col items-center">
+            <button
+              className="absolute top-4 right-4 bg-slate-900/60 hover:bg-slate-900/80 text-white rounded-full p-2 transition-colors z-10"
+              onClick={() => setSelectedPhotoUrl(null)}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <img
+              src={selectedPhotoUrl}
+              alt="Cardholder"
+              className="max-w-full max-h-[75vh] rounded-xl object-contain"
+            />
           </div>
         </div>
       )}

@@ -121,7 +121,7 @@ async function createDailyReportSchedule(): Promise<void> {
         // when the next one is supposed to start.
         // SKIP = don't start a new one, wait for next day.
         // This prevents duplicate reports if DB is slow one night.
-        overlap: ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_SKIP,
+        overlap: ScheduleOverlapPolicy.SKIP,
       },
 
       // ── HUMAN-READABLE DESCRIPTION ───────────────────────

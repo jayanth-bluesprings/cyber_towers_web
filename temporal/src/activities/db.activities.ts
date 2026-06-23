@@ -1,265 +1,154 @@
 // ═══════════════════════════════════════════════════════════════
-//  WHAT ARE TEMPORAL ACTIVITIES?
-// ═══════════════════════════════════════════════════════════════
+//  DB ACTIVITIES — PostgreSQL (cybertowers_access)
 //
-//  Activities = the functions that do REAL WORK (DB queries, emails,
-//  HTTP calls, file writes, etc.)
+//  All queries now hit PostgreSQL via the 'pg' module, the same
+//  database the backend uses. SQL Server (TimeWatch) is NOT used
+//  by Temporal — only the backend's bridge routes touch TimeWatch.
 //
-//  Workflows CANNOT do any of this directly — they only CALL activities.
-//  Activities run in a normal Node.js environment and CAN do anything.
-//
-//  If an activity FAILS (network error, DB timeout, etc.), Temporal
-//  automatically RETRIES it. The workflow just waits and does not crash.
-//
-//  async function = a function that does something that takes time
-//  await          = "pause here and wait for this to finish"
-//  Promise<T>     = "this function will eventually return a value of type T"
-//
-//  Examples:
-//    async function getName(): Promise<string>  → returns text eventually
-//    async function saveRow(): Promise<void>    → returns nothing eventually
-//    async function getAge():  Promise<number>  → returns a number eventually
+//  Tables used:
+//    cybertowers.cards              — registered RFID cards / personnel
+//    cybertowers.company_slots      — per-company parking slot counters
+//    cybertowers.temporal_audit_log — durable audit trail of workflow events
 //
 // ═══════════════════════════════════════════════════════════════
 
-import * as sql from 'mssql';
+import { Pool } from 'pg';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import type { PersonnelRecord, CompanyQuota, AuditLogEntry } from '../shared/types';
 
-// Load .env from the backend folder (same .env the Express server uses)
 dotenv.config({ path: path.join(__dirname, '../../../backend/.env') });
 
-// ─── DB CONNECTION ────────────────────────────────────────────
-// Same config as backend/db.js — reads from the same .env file
-const dbConfig: sql.config = {
-  user:     process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  server:   process.env.DB_SERVER || 'localhost',
-  database: process.env.DB_DATABASE || process.env.DB_NAME || 'TimeWatch',
-  port:     parseInt(process.env.DB_PORT || '1433'),
-  options: {
-    encrypt:                false,
-    trustServerCertificate: true,
-    requestTimeout:         30000,
-  },
-  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 },
-};
-
-// Singleton pool — created once, reused for all queries
-let _pool: sql.ConnectionPool | null = null;
-
-async function getPool(): Promise<sql.ConnectionPool> {
-  if (!_pool) {
-    _pool = await new sql.ConnectionPool(dbConfig).connect();
-  }
-  return _pool;
-}
+// ─── PG POOL ──────────────────────────────────────────────────
+// Reads the same env vars as the backend (PG_HOST, PG_PORT, etc.)
+const _pool = new Pool({
+  host:     process.env.PG_HOST     || '127.0.0.1',
+  port:     parseInt(process.env.PG_PORT || '5432'),
+  database: process.env.PG_DATABASE || 'cybertowers_access',
+  user:     process.env.PG_USER     || 'postgres',
+  password: process.env.PG_PASSWORD || '',
+  max:      10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+});
 
 // ─── ACTIVITY 1: lookupPersonnel ─────────────────────────────
-// Called by WF1 right after a card scan.
-// Queries the CardRecord table to find who this card belongs to,
-// and whether they are authorized (PCode present) or not.
-//
-// Returns null if the card is completely unknown.
+// Queries cybertowers.cards to find who this RFID card belongs to.
+// Returns null if the card is not registered.
 export async function lookupPersonnel(
-  cardId: string                // the RFID card number from the gate scan
+  cardId: string
 ): Promise<PersonnelRecord | null> {
+  const res = await _pool.query(
+    `SELECT
+       id             AS "personnelId",
+       card_no        AS "cardData",
+       COALESCE(person_code, '') AS "pCode",
+       COALESCE(person_name, '') AS "pName",
+       COALESCE(department, company_code, '') AS "company"
+     FROM cybertowers.cards
+     WHERE card_no = $1
+       AND (card_status IS NULL OR card_status != 'Deleted')
+     LIMIT 1`,
+    [String(cardId)]
+  );
 
-  // CardData column is bigint — non-numeric IDs will never exist in the DB
-  if (!/^\d+$/.test(cardId)) return null;
+  if (res.rows.length === 0) return null;
 
-  const pool    = await getPool();
-  const request = pool.request();
-
-  // @cardId = the SQL parameter — prevents SQL injection
-  request.input('cardId', sql.NVarChar, cardId);
-
-  // Get the most recent scan record for this card to find out who it belongs to
-  const result = await request.query(`;
-    SELECT TOP 1
-      PersonnelID,
-      CardData,
-      ISNULL(PCode, '')  AS PCode,
-      ISNULL(PName, '')  AS PName,
-      ISNULL(PCode, '')  AS Company
-    FROM CardRecord WITH (NOLOCK)
-    WHERE CardData = @cardId
-    ORDER BY DataTime DESC
-  `);
-
-  if (result.recordset.length === 0) return null;
-
-  const row = result.recordset[0];
-
-  // Return a PersonnelRecord shaped object
+  const row = res.rows[0];
   return {
-    personnelId: String(row.PersonnelID ?? ''),
-    cardData:    String(row.CardData    ?? ''),
-    pCode:       String(row.PCode       ?? '').trim(),
-    pName:       String(row.PName       ?? '').trim(),
-    company:     String(row.PCode       ?? '').trim(), // PCode IS the company code
+    personnelId: String(row.personnelId ?? ''),
+    cardData:    String(row.cardData    ?? ''),
+    pCode:       String(row.pCode       ?? '').trim(),
+    pName:       String(row.pName       ?? '').trim(),
+    company:     String(row.company     ?? '').trim(),
   };
 }
 
-// ─── HELPER: ensure CompanySlots table exists ─────────────────
-// Called before any CompanySlots query. Creates the table + inserts a
-// default row for the company if neither exist. This means the workflows
-// work on a fresh DB without any manual SQL setup step.
-async function ensureCompanySlots(pool: sql.ConnectionPool, companyCode: string): Promise<void> {
-  // Create table if it doesn't exist (safe to run repeatedly)
-  await pool.request().query(`
-    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='CompanySlots' AND xtype='U')
-    CREATE TABLE CompanySlots (
-      CompanyCode   NVARCHAR(50) PRIMARY KEY,
-      CompanyName   NVARCHAR(100),
-      TotalSlots    INT NOT NULL DEFAULT 10,
-      OccupiedSlots INT NOT NULL DEFAULT 0
-    )
-  `);
-
-  // Insert a default row for this company if no row exists yet
-  const req = pool.request();
-  req.input('companyCode', sql.NVarChar, companyCode);
-  await req.query(`
-    IF NOT EXISTS (SELECT 1 FROM CompanySlots WHERE CompanyCode = @companyCode)
-    INSERT INTO CompanySlots (CompanyCode, CompanyName, TotalSlots, OccupiedSlots)
-    VALUES (@companyCode, @companyCode, 10, 0)
-  `);
+// ─── ENSURE COMPANY SLOT ROW EXISTS ──────────────────────────
+// Auto-inserts a default row (10 slots) if none exists yet.
+// Safe to call repeatedly — uses INSERT ON CONFLICT DO NOTHING.
+async function ensureCompanySlots(companyCode: string): Promise<void> {
+  await _pool.query(
+    `INSERT INTO cybertowers.company_slots (company_code, company_name, total_slots, occupied_slots)
+     VALUES ($1, $1, 10, 0)
+     ON CONFLICT (company_code) DO NOTHING`,
+    [companyCode]
+  );
 }
 
 // ─── ACTIVITY 2: getCompanyQuota ──────────────────────────────
-// Called by WF1 to check: does this company still have free parking?
-// Auto-creates CompanySlots table and default row on first run.
 export async function getCompanyQuota(
-  companyCode: string   // the PCode value — e.g. "MSFT"
+  companyCode: string
 ): Promise<CompanyQuota> {
+  await ensureCompanySlots(companyCode);
 
-  const pool = await getPool();
+  const res = await _pool.query(
+    `SELECT company_code, company_name, total_slots, occupied_slots
+     FROM cybertowers.company_slots
+     WHERE company_code = $1`,
+    [companyCode]
+  );
 
-  // Auto-create table + default row so this never fails on a fresh DB
-  await ensureCompanySlots(pool, companyCode);
-
-  const request = pool.request();
-  request.input('companyCode', sql.NVarChar, companyCode);
-
-  const result = await request.query(`
-    SELECT CompanyCode, CompanyName, TotalSlots, OccupiedSlots
-    FROM CompanySlots WITH (NOLOCK)
-    WHERE CompanyCode = @companyCode
-  `);
-
-  if (result.recordset.length === 0) {
-    // Should not happen after ensureCompanySlots, but safe fallback
-    console.warn(`[Temporal] CompanySlots: no row found for ${companyCode}, using default 10`);
-    return {
-      companyCode,
-      companyName:   companyCode,
-      totalSlots:    10,
-      occupiedSlots: 0,
-    };
+  if (res.rows.length === 0) {
+    return { companyCode, companyName: companyCode, totalSlots: 10, occupiedSlots: 0 };
   }
 
-  const row = result.recordset[0];
+  const row = res.rows[0];
   return {
-    companyCode:   row.CompanyCode,
-    companyName:   row.CompanyName,
-    totalSlots:    row.TotalSlots,
-    occupiedSlots: row.OccupiedSlots,
+    companyCode:   row.company_code,
+    companyName:   row.company_name,
+    totalSlots:    row.total_slots,
+    occupiedSlots: row.occupied_slots,
   };
 }
 
 // ─── ACTIVITY 3: incrementCompanyCount ───────────────────────
-// Called by WF1 when an authorized vehicle enters.
-// Adds 1 to OccupiedSlots for that company.
 export async function incrementCompanyCount(companyCode: string): Promise<number> {
-  const pool = await getPool();
+  await ensureCompanySlots(companyCode);
 
-  // Ensure table + row exist before updating
-  await ensureCompanySlots(pool, companyCode);
-
-  const request = pool.request();
-  request.input('companyCode', sql.NVarChar, companyCode);
-  await request.query(`
-    UPDATE CompanySlots
-    SET OccupiedSlots = OccupiedSlots + 1
-    WHERE CompanyCode = @companyCode
-  `);
-
-  const r2 = pool.request();
-  r2.input('companyCode', sql.NVarChar, companyCode);
-  const result = await r2.query(`
-    SELECT OccupiedSlots, TotalSlots FROM CompanySlots WHERE CompanyCode = @companyCode
-  `);
-  return result.recordset[0]?.OccupiedSlots ?? 0;
+  const res = await _pool.query(
+    `UPDATE cybertowers.company_slots
+     SET occupied_slots = occupied_slots + 1,
+         updated_at     = NOW()
+     WHERE company_code = $1
+     RETURNING occupied_slots`,
+    [companyCode]
+  );
+  return res.rows[0]?.occupied_slots ?? 0;
 }
 
 // ─── ACTIVITY 4: decrementCompanyCount ───────────────────────
-// Called by WF1 when a vehicle exits. Subtracts 1 from OccupiedSlots.
-// Never goes below 0.
 export async function decrementCompanyCount(companyCode: string): Promise<number> {
-  const pool = await getPool();
+  await ensureCompanySlots(companyCode);
 
-  // Ensure table + row exist before updating (handles fresh DB or missing row)
-  await ensureCompanySlots(pool, companyCode);
-
-  const request = pool.request();
-  request.input('companyCode', sql.NVarChar, companyCode);
-  await request.query(`
-    UPDATE CompanySlots
-    SET OccupiedSlots = CASE WHEN OccupiedSlots > 0 THEN OccupiedSlots - 1 ELSE 0 END
-    WHERE CompanyCode = @companyCode
-  `);
-
-  const r2 = pool.request();
-  r2.input('companyCode', sql.NVarChar, companyCode);
-  const result = await r2.query(`
-    SELECT OccupiedSlots FROM CompanySlots WHERE CompanyCode = @companyCode
-  `);
-  return result.recordset[0]?.OccupiedSlots ?? 0;
+  const res = await _pool.query(
+    `UPDATE cybertowers.company_slots
+     SET occupied_slots = GREATEST(occupied_slots - 1, 0),
+         updated_at     = NOW()
+     WHERE company_code = $1
+     RETURNING occupied_slots`,
+    [companyCode]
+  );
+  return res.rows[0]?.occupied_slots ?? 0;
 }
 
 // ─── ACTIVITY 5: writeAuditLog ────────────────────────────────
-// Every important event (entry, denial, override, exit) is recorded here.
-// Creates the TemporalAuditLog table if it doesn't exist (first run).
 export async function writeAuditLog(entry: AuditLogEntry): Promise<void> {
-  const pool    = await getPool();
-
-  // Create the audit log table if it doesn't exist yet
-  await pool.request().query(`;
-    IF NOT EXISTS (
-      SELECT * FROM sysobjects WHERE name='TemporalAuditLog' AND xtype='U'
-    )
-    CREATE TABLE TemporalAuditLog (
-      Id            INT IDENTITY(1,1) PRIMARY KEY,
-      EventType     NVARCHAR(60),
-      CardId        NVARCHAR(50),
-      VehicleNumber NVARCHAR(50),
-      Gate          NVARCHAR(20),
-      EventTime     NVARCHAR(30),
-      CompanyCode   NVARCHAR(50),
-      PersonName    NVARCHAR(100),
-      Notes         NVARCHAR(500),
-      CreatedAt     DATETIME DEFAULT GETDATE()
-    )
-  `);
-
-  const request = pool.request();
-  request.input('eventType',     sql.NVarChar, entry.eventType);
-  request.input('cardId',        sql.NVarChar, entry.cardId);
-  request.input('vehicleNumber', sql.NVarChar, entry.vehicleNumber);
-  request.input('gate',          sql.NVarChar, entry.gate);
-  request.input('timestamp',     sql.NVarChar, entry.timestamp);
-  request.input('companyCode',   sql.NVarChar, entry.companyCode ?? '');
-  request.input('pName',         sql.NVarChar, entry.pName       ?? '');
-  request.input('notes',         sql.NVarChar, entry.notes       ?? '');
-
-  await request.query(`;
-    INSERT INTO TemporalAuditLog
-      (EventType, CardId, VehicleNumber, Gate, EventTime, CompanyCode, PersonName, Notes)
-    VALUES
-      (@eventType, @cardId, @vehicleNumber, @gate, @timestamp, @companyCode, @pName, @notes)
-  `);
+  await _pool.query(
+    `INSERT INTO cybertowers.temporal_audit_log
+       (event_type, card_id, vehicle_number, gate, event_time, company_code, person_name, notes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [
+      entry.eventType,
+      entry.cardId,
+      entry.vehicleNumber,
+      entry.gate,
+      entry.timestamp,
+      entry.companyCode ?? '',
+      entry.pName       ?? '',
+      entry.notes       ?? '',
+    ]
+  );
 
   console.log(`[AuditLog] ${entry.eventType} | ${entry.vehicleNumber} | ${entry.gate} | ${entry.timestamp}`);
 }

@@ -188,5 +188,5 @@ export interface WeeklyReportStats {
   topCards:          TopCard[];            // top 5 most frequently entering people
   overnightCount:    number;               // distinct vehicles that stayed > 12 hours
   insideVehicles:    InsideVehicle[];      // full list of vehicles currently inside
-  reportGeneratedAt: string;              // ISO timestamp of when the report was built
+  reportGeneratedAt: string;               // ISO timestamp of when the report was built
 }

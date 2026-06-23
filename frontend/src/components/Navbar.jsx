@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 
 // Pages each role can see in the nav
 const ROLE_NAV = {
-  security:   ['dashboard', 'live'],
-  supervisor: ['dashboard', 'live', 'report'],
-  admin:      ['dashboard', 'live', 'report', 'config'],
+  security:   ['dashboard', 'live', 'tags'],
+  supervisor: ['dashboard', 'live', 'report', 'tags'],
+  admin:      ['dashboard', 'live', 'report', 'config', 'tags'],
 };
 
 const ROLE_LABELS = {
@@ -40,6 +40,16 @@ const ALL_NAV_ITEMS = [
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
           d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+  },
+  {
+    key: 'tags',
+    label: 'Register Tag',
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A2 2 0 014 7V4a1 1 0 011-1z" />
       </svg>
     ),
   },

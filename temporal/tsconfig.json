@@ -9,7 +9,6 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "moduleResolution": "node10",
-    "ignoreDeprecations": "6.0",
     "sourceMap":       true,
     "declaration":     true,
     "skipLibCheck":    true

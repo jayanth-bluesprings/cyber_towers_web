@@ -3,7 +3,7 @@ import Navbar from '../components/Navbar.jsx';
 import StatsCards from '../components/StatsCards.jsx';
 import VehicleChart from '../components/VehicleChart.jsx';
 import LiveTable from '../components/LiveTable.jsx';
-import { fetchTrigger24hAlert, fetchVehicleCount, fetchHealthEvents } from '../api/index.js';
+import { fetchTrigger24hAlert, fetchVehicleCount } from '../api/index.js';
 
 export default function Dashboard({ dark, setDark, onNavigate, onLogout, activePage = 'dashboard', role = 'security' }) {
   const [wsStatus, setWsStatus] = useState('connecting');
@@ -55,18 +55,11 @@ export default function Dashboard({ dark, setDark, onNavigate, onLogout, activeP
     try {
       await fetchVehicleCount();
       const latency = Date.now() - start;
-      let events = null;
-      try {
-        const evRes = await fetchHealthEvents();
-        events = evRes.data || null;
-      } catch {
-        events = null;
-      }
       setHealthResults({
         api: { ok: true, latency },
         ws: wsStatus,
         db: { ok: true },
-        events,
+        events: null,
       });
     } catch {
       setHealthResults({

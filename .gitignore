@@ -32,3 +32,10 @@ Thumbs.db
 
 # Temporal compiled output
 temporal/lib/
+
+# Database backups (may contain sensitive data)
+backend/database/backups/
+*.dump
+
+# Editor lock / temp files
+~$*

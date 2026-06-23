@@ -1,69 +1,31 @@
-const { query } = require('../db');
-const { getPersonnelMap, enrichWithCache } = require('../personnelCache');
+const { getRecentEvents } = require('../repositories/scanEventsRepo');
+const { listCards } = require('../repositories/cardsRepo');
+const { pgQuery } = require('../pgdb');
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const BASE_DATE = new Date('1899-12-30').getTime();
-
-function toDataTimeFloat(dateStr, inclusiveEnd = false) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return null;
-  if (inclusiveEnd) d.setDate(d.getDate() + 1); // include end date fully
-  return (d.getTime() - BASE_DATE) / MS_PER_DAY;
-}
+const SCHEMA = 'cybertowers';
 
 async function getLive(req, res) {
   try {
     const { startDate, endDate } = req.query;
-    const startFloat = toDataTimeFloat(startDate);
-    const endFloat = toDataTimeFloat(endDate, true);
     const limit = Math.min(parseInt(req.query.limit || '4000', 10) || 4000, 5000);
-
-    const personnelMap = await getPersonnelMap();
-    const whereParts = [];
-    const params = {};
-    if (startFloat !== null) { whereParts.push('c.DataTime >= @startFloat'); params.startFloat = startFloat; }
-    if (endFloat !== null) { whereParts.push('c.DataTime < @endFloat'); params.endFloat = endFloat; }
-    const whereClause = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
-
-    const result = await query(`
-      SET NOCOUNT ON;
-      SELECT TOP ${limit}
-        c.CardRecordID, c.CardData, c.PName, c.PCode, c.DeptName, c.EquptName, c.PersonnelID, c.PortNum,
-        DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') AS ScanTime
-      FROM CardRecord c WITH (NOLOCK)
-      ${whereClause}
-      ORDER BY c.CardRecordID DESC
-    `, params);
-    const records = result.recordset.map(r => enrichWithCache(r, personnelMap));
-    res.json({ success: true, data: records });
+    const since = startDate ? new Date(startDate).toISOString() : undefined;
+    const rows = await getRecentEvents({ limit, since });
+    const data = endDate
+      ? rows.filter(r => new Date(r.event_date) <= new Date(endDate + 'T23:59:59Z'))
+      : rows;
+    res.json({ success: true, data });
   } catch (err) {
     console.error('getLive error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 }
 
+// 'since' is an ISO timestamp — returns events newer than that timestamp
 async function getNew(req, res) {
-  const lastId = parseInt(req.query.lastId || '0');
   try {
-    const personnelMap = await getPersonnelMap();
-    const result = await query(
-      `SET NOCOUNT ON;
-      WITH RecentRows AS (
-        SELECT TOP 500 * 
-        FROM CardRecord WITH (NOLOCK)
-        WHERE CardRecordID > @lastId
-        ORDER BY CardRecordID ASC
-      )
-      SELECT
-        c.CardRecordID, c.CardData, c.PName, c.PCode, c.DeptName, c.EquptName, c.PersonnelID, c.PortNum,
-        DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') AS ScanTime
-      FROM RecentRows c
-      ORDER BY c.CardRecordID ASC`,
-      { lastId }
-    );
-    const records = result.recordset.map(r => enrichWithCache(r, personnelMap));
-    res.json({ success: true, data: records });
+    const since = req.query.since || req.query.lastId;
+    const rows = await getRecentEvents({ limit: 500, since });
+    res.json({ success: true, data: rows });
   } catch (err) {
     console.error('getNew error:', err.message);
     res.status(500).json({ success: false, error: err.message });
@@ -73,35 +35,29 @@ async function getNew(req, res) {
 async function search(req, res) {
   const { q, startDate, endDate } = req.query;
   if (!q) return res.json({ success: true, data: [] });
-  const like = `%${q}%`;
-  const startFloat = toDataTimeFloat(startDate);
-  const endFloat = toDataTimeFloat(endDate, true);
   try {
-    const personnelMap = await getPersonnelMap();
-    const whereParts = [];
-    const params = { like };
-    if (startFloat !== null) { whereParts.push('c.DataTime >= @startFloat'); params.startFloat = startFloat; }
-    if (endFloat !== null) { whereParts.push('c.DataTime < @endFloat'); params.endFloat = endFloat; }
-    const whereClause = whereParts.length ? `AND ${whereParts.join(' AND ')}` : '';
-
-    const result = await query(
-      `SET NOCOUNT ON;
-      WITH RecentRows AS (
-        SELECT TOP 3000 * 
-        FROM CardRecord WITH (NOLOCK)
-        ORDER BY CardRecordID DESC
-      )
-      SELECT TOP 100
-        c.CardRecordID, c.CardData, c.PName, c.PCode, c.DeptName, c.EquptName, c.PersonnelID, c.PortNum,
-        DATEADD(SECOND, c.DataTime * 86400, '1899-12-30') AS ScanTime
-      FROM RecentRows c
-      WHERE (c.CardData LIKE @like OR c.PName LIKE @like OR c.PCode LIKE @like)
-        ${whereClause}
-      ORDER BY c.CardRecordID DESC`,
-      params
-    );
-    const records = result.recordset.map(r => enrichWithCache(r, personnelMap));
-    res.json({ success: true, data: records });
+    const params = [`%${q}%`];
+    const conditions = [
+      `(card_no ILIKE $1 OR person_name ILIKE $1 OR vehicle_number ILIKE $1 OR company_code ILIKE $1)`,
+    ];
+    if (startDate) {
+      params.push(new Date(startDate).toISOString());
+      conditions.push(`event_date >= $${params.length}`);
+    }
+    if (endDate) {
+      params.push(new Date(endDate + 'T23:59:59Z').toISOString());
+      conditions.push(`event_date <= $${params.length}`);
+    }
+    params.push(100);
+    const { rows } = await pgQuery(`
+      SELECT id, event_date, card_no, controller_sn, direction, access_result, denial_reason,
+             person_name, company_code, vehicle_number, location_label, is_alert
+      FROM ${SCHEMA}.scan_events
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY event_date DESC
+      LIMIT $${params.length}
+    `, params);
+    res.json({ success: true, data: rows });
   } catch (err) {
     console.error('search error:', err.message);
     res.status(500).json({ success: false, error: err.message });
@@ -110,33 +66,27 @@ async function search(req, res) {
 
 async function getAuthorizedVehicles(req, res) {
   try {
-    const result = await query(`
-      SET NOCOUNT ON;
-      SELECT
-        p.PersonnelID,
-        p.CardData,
-        p.PName,
-        p.PCode,
-        p.Addr,
-        pe2.CarNumber,
-        p.PDesc        AS Remark,
-        p.graduateSchool AS BloodGroup
-      FROM Personnel p WITH (NOLOCK)
-      LEFT JOIN PersonnelExtend2 pe2 WITH (NOLOCK) ON pe2.PersonnelID = p.PersonnelID
-      WHERE p.CardData IS NOT NULL
-        AND p.CardData != ''
-        AND p.CardData != '0'
-      ORDER BY p.PersonnelID DESC
-    `);
-
-    const records = result.recordset.map(r => {
-      const rawType = (r.Remark || '').toString().trim();
-      const upper = rawType.toUpperCase();
-      const vehicleType = upper.startsWith('2') ? '2W' : upper.startsWith('4') ? '4W' : rawType || '-';
-      return { ...r, vehicleType };
-    });
-
-    res.json({ success: true, data: records });
+    const { cards } = await listCards({ limit: 2000 });
+    const data = cards.map(c => ({
+      card_no: c.card_no,
+      person_name: c.person_name,
+      company_code: c.company_code,
+      vehicle_number: c.vehicle_number,
+      vehicle_type: c.vehicle_type,
+      blood_group: c.blood_group,
+      // Legacy aliases — the Config Vehicles tab / Parking page use an inverted
+      // convention where PName = the VEHICLE NUMBER and CarNumber = the PERSON NAME.
+      CardData: c.card_no,
+      PName: c.vehicle_number,                       // displayed as "Vehicle No."
+      CarNumber: c.person_name,                      // displayed as the title (Name)
+      PCode: c.company_code || c.person_code,
+      // Company is registered into the `department` column (UI label "Company").
+      Addr: c.department || c.company_name || c.company_code || '',
+      BloodGroup: c.blood_group || '',
+      Remark: c.vehicle_type,
+      vehicleType: c.vehicle_type,
+    }));
+    res.json({ success: true, data });
   } catch (err) {
     console.error('getAuthorizedVehicles error:', err.message);
     res.status(500).json({ success: false, error: err.message });

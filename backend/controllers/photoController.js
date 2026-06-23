@@ -1,83 +1,50 @@
-const { query } = require('../db');
+const { pgQuery } = require('../pgdb');
 
-let _colCache = undefined;
-let _colCacheAt = 0;
-const COL_TTL = 5 * 60 * 1000;
-
-async function discoverPhotoColumn() {
-  const now = Date.now();
-  if (_colCache !== undefined && now - _colCacheAt < COL_TTL) return _colCache;
-
-  try {
-    const result = await query(`
-      SELECT TOP 1 TABLE_NAME, COLUMN_NAME
-      FROM INFORMATION_SCHEMA.COLUMNS WITH (NOLOCK)
-      WHERE COLUMN_NAME IN ('Photo','photo','UserPhoto','FacePhoto','Picture','Image','Avatar','Pic')
-        AND TABLE_NAME IN ('Personnel','PersonnelPhoto','PersonnelFace','PersonnelExtend','PersonnelExtend2')
-      ORDER BY
-        CASE TABLE_NAME  WHEN 'Personnel'      THEN 1
-                         WHEN 'PersonnelPhoto' THEN 2
-                         WHEN 'PersonnelFace'  THEN 3
-                         ELSE 4 END,
-        CASE COLUMN_NAME WHEN 'Photo' THEN 1
-                         WHEN 'photo' THEN 2
-                         ELSE 3 END
-    `);
-    _colCache = result.recordset[0] || null;
-  } catch (err) {
-    console.error('[photo] Column discovery error:', err.message);
-    _colCache = null;
-  }
-  _colCacheAt = Date.now();
-  console.log('[photo] Discovered photo column:', _colCache);
-  return _colCache;
-}
-
+// Photo resolution order for a card:
+//   1. photo_data — a locally uploaded image (base64, optionally a data: URI). Served as bytes.
+//   2. photo_url  — an external link. We redirect the browser to it.
 async function getPersonPhoto(req, res) {
   const { cardId } = req.params;
   if (!cardId) return res.status(400).send('cardId required');
 
   try {
-    const col = await discoverPhotoColumn();
-    if (!col) return res.status(404).send('no-photo-column');
+    const { rows } = await pgQuery(
+      `SELECT photo_data, photo_url FROM cybertowers.cards WHERE card_no = $1 AND deleted_at IS NULL`,
+      [cardId]
+    );
+    const row = rows[0];
+    if (!row) return res.status(404).send('no-photo');
 
-    let photoResult;
-    if (col.TABLE_NAME === 'Personnel') {
-      photoResult = await query(
-        `SELECT ${col.COLUMN_NAME} AS Photo
-         FROM Personnel WITH (NOLOCK)
-         WHERE CardData = @cardId
-           AND ${col.COLUMN_NAME} IS NOT NULL`,
-        { cardId }
-      );
-    } else {
-      photoResult = await query(
-        `SELECT t.${col.COLUMN_NAME} AS Photo
-         FROM ${col.TABLE_NAME} t WITH (NOLOCK)
-         INNER JOIN Personnel p WITH (NOLOCK) ON p.PersonnelID = t.PersonnelID
-         WHERE p.CardData = @cardId
-           AND t.${col.COLUMN_NAME} IS NOT NULL`,
-        { cardId }
-      );
+    const photoData = row.photo_data;
+
+    if (photoData) {
+      let buf;
+      let contentType = 'image/jpeg';
+      if (Buffer.isBuffer(photoData)) {
+        buf = photoData;
+      } else if (typeof photoData === 'string') {
+        // Accept raw base64 or a full data: URI (data:image/png;base64,....)
+        const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/s.exec(photoData);
+        if (match) {
+          contentType = match[1];
+          buf = Buffer.from(match[2], 'base64');
+        } else {
+          buf = Buffer.from(photoData, 'base64');
+        }
+      }
+      if (buf && buf.length >= 4) {
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        return res.send(buf);
+      }
     }
 
-    const photoData = photoResult.recordset[0]?.Photo;
-    if (!photoData) return res.status(404).send('no-photo');
-
-    let buf;
-    if (Buffer.isBuffer(photoData)) {
-      buf = photoData;
-    } else if (typeof photoData === 'string') {
-      buf = Buffer.from(photoData, 'base64');
-    } else {
-      return res.status(404).send('invalid-photo-data');
+    // Fall back to the external link
+    if (row.photo_url) {
+      return res.redirect(302, row.photo_url);
     }
 
-    if (buf.length < 4) return res.status(404).send('empty-photo');
-
-    res.setHeader('Content-Type', 'image/jpeg');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.send(buf);
+    return res.status(404).send('no-photo');
   } catch (err) {
     console.error('[photo] getPersonPhoto error:', err.message);
     res.status(500).send('error');
@@ -85,8 +52,17 @@ async function getPersonPhoto(req, res) {
 }
 
 async function getPhotoSchema(req, res) {
-  const col = await discoverPhotoColumn();
-  res.json({ found: !!col, column: col || null });
+  try {
+    // Check if photo_data column exists in cybertowers.cards
+    const { rows } = await pgQuery(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'cybertowers' AND table_name = 'cards' AND column_name = 'photo_data'
+    `);
+    const found = rows.length > 0;
+    res.json({ found, column: found ? { TABLE_NAME: 'cards', COLUMN_NAME: 'photo_data' } : null });
+  } catch (err) {
+    res.json({ found: false, column: null });
+  }
 }
 
 module.exports = { getPersonPhoto, getPhotoSchema };

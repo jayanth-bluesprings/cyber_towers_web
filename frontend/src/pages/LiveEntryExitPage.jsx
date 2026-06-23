@@ -1,23 +1,19 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '../components/Navbar.jsx';
-import { fetchLive, fetchSearch, WS_URL } from '../api/index.js';
+import { fetchLive, fetchSearch, WS_URL, getPersonPhotoUrl } from '../api/index.js';
 import { loadStoredEntryExitRecords, saveStoredEntryExitRecords } from '../utils/entryExitStorage.js';
 import { loadLocalAccessApprovals, saveLocalAccessApprovals } from '../utils/localAccessApprovalsStorage.js';
 import { loadParkingAllocations } from '../utils/parkingStorage.js';
 
 /* ─── helpers ─────────────────────────────────────────────── */
+
+// Convert a real UTC ISO timestamp to IST display string
 function formatTime(scanTime) {
   if (!scanTime) return '-';
   try {
-    const raw = String(scanTime).trim();
-    // All ScanTime values use "IST wall-clock as fake UTC" convention (matching the
-    // TimeWatch DB). Strip the Z so JavaScript does not reinterpret the value as true
-    // UTC, then append +05:30 to parse the wall-clock value as IST explicitly.
-    // Using timeZone: 'Asia/Kolkata' ensures correct display on any browser timezone.
-    const noZ = raw.endsWith('Z') ? raw.slice(0, -1) : raw;
-    const d = new Date(noZ + '+05:30');
-    if (Number.isNaN(d.getTime())) return raw;
+    const d = new Date(scanTime);
+    if (Number.isNaN(d.getTime())) return String(scanTime);
     return d.toLocaleString('en-IN', {
       timeZone: 'Asia/Kolkata',
       day: '2-digit',
@@ -31,6 +27,44 @@ function formatTime(scanTime) {
   } catch {
     return String(scanTime);
   }
+}
+
+// Normalize any record (PostgreSQL bridge_event or legacy new_scans) to a consistent shape.
+// All rendering code uses the legacy field aliases; new code uses the pg_ fields.
+function normalizeRecord(r) {
+  const direction = r.direction || (r.PortNum === 2 ? 'Out' : r.PortNum === 1 ? 'In' : 'N/A');
+  const eventDate = r.event_date || r.ScanTime || r.eventDate || '';
+  const uniqueId  = String(r.id || r.CardRecordID || `tmp-${Date.now()}-${Math.random()}`);
+
+  return {
+    // Unified key — UUID for bridge events, numeric string for legacy
+    _id: uniqueId,
+    // PostgreSQL field names
+    id:             r.id || r.CardRecordID,
+    card_no:        r.card_no || r.CardData || r.cardNo || '',
+    person_name:    r.person_name || r.PName || r.personName || '',
+    company_code:   r.company_code || r.PCode || r.DeptName || '',
+    location_label: r.location_label || r.EquptName || r.locationLabel || '',
+    direction,
+    event_date:     eventDate,
+    vehicle_number: r.vehicle_number || r.CarNumber || r.vehicleNumber || '',
+    vehicle_type:   r.vehicle_type || r.vehicleType || '',
+    vehicle_brand:  r.vehicle_brand || r.vehicleBrand || '',
+    vehicle_color:  r.vehicle_color || r.vehicleColor || '',
+    access_result:  r.access_result || r.accessResult || 'Unknown',
+    // Legacy aliases so existing rendering code requires zero changes
+    CardRecordID: uniqueId,
+    CardData:     r.card_no || r.CardData || r.cardNo || '',
+    PName:        r.person_name || r.PName || r.personName || '',
+    PCode:        r.company_code || r.PCode || r.DeptName || '',
+    DeptName:     r.company_code || r.DeptName || '',
+    EquptName:    r.location_label || r.EquptName || r.locationLabel || '',
+    PortNum:      direction === 'Out' ? 2 : direction === 'In' ? 1 : 0,
+    ScanTime:     eventDate,
+    CarNumber:    r.vehicle_number || r.CarNumber || r.vehicleNumber || '',
+    vehicleType:  r.vehicle_type || r.vehicleType || '',
+    flatNumber:   r.company_code || r.flatNumber || r.PCode || '',
+  };
 }
 
 function getGateInfo(equptName, portNum) {
@@ -113,15 +147,19 @@ function getSlotLabel(parkingSpace) {
 const DEDUP_SECONDS = 60; // 60 s window: collapses rapid burst reads from exit scanner
 
 function mergeRecords(existing, incoming, maxLen = 5000) {
-  const byId = new Map(existing.map((r) => [r.CardRecordID, r]));
-  for (const r of incoming) byId.set(r.CardRecordID, r);
-  const sorted = Array.from(byId.values()).sort((a, b) => b.CardRecordID - a.CardRecordID);
+  const normalized = incoming.map(normalizeRecord);
+  const byId = new Map(existing.map((r) => [r._id || r.CardRecordID, r]));
+  for (const r of normalized) byId.set(r._id, r);
+  const sorted = Array.from(byId.values()).sort((a, b) => {
+    const ta = new Date(a.ScanTime || 0).getTime();
+    const tb = new Date(b.ScanTime || 0).getTime();
+    return tb - ta;
+  });
   const seen = new Map();
   const deduped = [];
   for (const r of sorted) {
-    const s = String(r.ScanTime || '');
-    const ts = s.endsWith('Z') || s.includes('+') ? s : s + '+05:30';
-    const bucket = Math.floor(new Date(ts).getTime() / 1000 / DEDUP_SECONDS);
+    const ts = new Date(r.ScanTime || 0).getTime();
+    const bucket = Math.floor(ts / 1000 / DEDUP_SECONDS);
     const key = `${(r.CardData || '').toUpperCase()}|${bucket}|${r.PortNum ?? ''}`;
     if (!seen.has(key)) { seen.set(key, true); deduped.push(r); }
   }
@@ -138,7 +176,7 @@ function csvEscape(value) {
 }
 
 function exportCSV(records, localApprovals = {}, parkingByCardId = new Map()) {
-  const headers = ['Gate', 'Card ID', 'Vehicle Type', 'Flat/Code', 'Car Number', 'Parking Slot', 'Authorization', 'Scan Time'];
+  const headers = ['Gate', 'Card ID', 'Vehicle Type', 'Brand', 'Color', 'Flat/Code', 'Car Number', 'Parking Slot', 'Authorization', 'Scan Time'];
   const rows = records.map((r) => {
     const gate = getGateInfo(r.EquptName, r.PortNum);
     const key = getApprovalKey(r);
@@ -149,6 +187,8 @@ function exportCSV(records, localApprovals = {}, parkingByCardId = new Map()) {
       gate.label,
       r.CardData || '',
       r.vehicleType || r.VehicleType || '',
+      r.vehicle_brand || '',
+      r.vehicle_color || '',
       r.flatNumber || r.PCode || '',
       vehicleNo,
       parkingSlot,
@@ -188,9 +228,39 @@ function VehicleBadge({ type }) {
   return <span className="badge-unknown font-bold">{label}</span>;
 }
 
+function LivePersonPhoto({ cardId, name, onClick }) {
+  const [failed, setFailed] = useState(false);
+  const url = getPersonPhotoUrl(cardId);
+
+  if (!url || failed) {
+    const initials = (name || '?')
+      .split(' ')
+      .map((w) => w[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+    return (
+      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 dark:text-slate-300 shrink-0 select-none">
+        {initials}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={url}
+      alt={name || 'photo'}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      onClick={onClick}
+      className="w-10 h-10 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+    />
+  );
+}
+
 /* ─── main page ─────────────────────────────────────────── */
 export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout, activePage = 'live', role = 'security' }) {
-  const [records, setRecords] = useState(() => loadStoredEntryExitRecords());
+  const [records, setRecords] = useState(() => (loadStoredEntryExitRecords() || []).map(normalizeRecord));
   const [localApprovals, setLocalApprovals] = useState(() => loadLocalAccessApprovals());
   const [parkingAllocations, setParkingAllocations] = useState(() => loadParkingAllocations());
   const [dateRangeRecords, setDateRangeRecords] = useState([]);
@@ -198,6 +268,7 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
   const [newIds, setNewIds] = useState(new Set());
   const [wsStatus, setWsStatus] = useState('connecting');
   const [search, setSearch] = useState('');
+  const [selectedPhotoUrl, setSelectedPhotoUrl] = useState(null);
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [dirFilter, setDirFilter] = useState('all'); // 'all' | 'entry' | 'exit'
   const [dayToggle, setDayToggle] = useState('all'); // 'all' | 'today'
@@ -242,10 +313,10 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
     if (debouncedSearch || !liveData?.data) return;
 
     if (startDate || endDate) {
-      setDateRangeRecords(mergeRecords([], liveData.data));
+      setDateRangeRecords(mergeRecords([], liveData.data.map(normalizeRecord)));
     } else {
       setDateRangeRecords([]);
-      setRecords((prev) => mergeRecords(prev, liveData.data));
+      setRecords((prev) => mergeRecords(prev, liveData.data.map(normalizeRecord)));
     }
   }, [liveData, debouncedSearch, startDate, endDate]);
 
@@ -255,7 +326,7 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
       return;
     }
     if (searchData?.data) {
-      setSearchRecords(mergeRecords([], searchData.data));
+      setSearchRecords(mergeRecords([], searchData.data.map(normalizeRecord)));
     }
   }, [searchData, debouncedSearch]);
 
@@ -329,10 +400,23 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
+
+          // bridge_event: single live scan from FC8900 → Bridge → PostgreSQL → WebSocket
+          if (msg.type === 'bridge_event' && msg.data) {
+            const rec = normalizeRecord(msg.data);
+            setRecords((prev) => mergeRecords(prev, [rec]));
+            setNewIds((prev) => new Set([...prev, rec._id]));
+            setTimeout(() => {
+              setNewIds((prev) => { const n = new Set(prev); n.delete(rec._id); return n; });
+            }, 4000);
+          }
+
+          // new_scans: legacy Temporal workflow events (kept for backward compat)
           if (msg.type === 'new_scans' && Array.isArray(msg.data) && msg.data.length > 0) {
             const incoming = msg.data;
-            const ids = new Set(incoming.map((r) => r.CardRecordID));
-            setRecords((prev) => mergeRecords(prev, incoming));
+            const normalized = incoming.map(normalizeRecord);
+            const ids = new Set(normalized.map((r) => r._id));
+            setRecords((prev) => mergeRecords(prev, normalized));
             setNewIds((prev) => new Set([...prev, ...ids]));
             setTimeout(() => {
               setNewIds((prev) => { const n = new Set(prev); ids.forEach((id) => n.delete(id)); return n; });
@@ -640,8 +724,11 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
               <thead className="sticky top-0 bg-slate-50 dark:bg-slate-950/80 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800 z-10">
                 <tr className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   <th className="px-4 py-3 text-left whitespace-nowrap">Gate</th>
+                  <th className="px-3 py-3 text-left whitespace-nowrap">Photo</th>
                   <th className="px-4 py-3 text-left whitespace-nowrap">Card ID</th>
                   <th className="px-3 py-3 text-center whitespace-nowrap">Vehicle Type</th>
+                  <th className="px-3 py-3 text-left whitespace-nowrap hidden md:table-cell">Brand</th>
+                  <th className="px-3 py-3 text-left whitespace-nowrap hidden md:table-cell">Color</th>
                   <th className="px-3 py-3 text-left whitespace-nowrap hidden md:table-cell">Company Name</th>
                   <th className="px-3 py-3 text-left whitespace-nowrap">Car No.</th>
                   <th className="px-3 py-3 text-left whitespace-nowrap">Parking Slot</th>
@@ -655,7 +742,7 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
                 {loading ? (
                   Array.from({ length: 10 }).map((_, i) => (
                     <tr key={i} className="animate-pulse">
-                      {Array.from({ length: 9 }).map((_, j) => (
+                      {Array.from({ length: 12 }).map((_, j) => (
                         <td key={j} className="px-4 py-3">
                           <div className="h-3.5 rounded bg-slate-100 dark:bg-slate-800" style={{ width: `${45 + Math.random() * 40}%` }} />
                         </td>
@@ -664,7 +751,7 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
                   ))
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-20 text-center">
+                    <td colSpan={12} className="px-4 py-20 text-center">
                       <div className="flex flex-col items-center gap-3 opacity-50">
                         <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -675,7 +762,7 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
                   </tr>
                 ) : (
                   filtered.map((record) => {
-                    const isNew = newIds.has(record.CardRecordID);
+                    const isNew = newIds.has(record._id || record.CardRecordID);
                     const gate = getGateInfo(record.EquptName, record.PortNum);
                     const key = getApprovalKey(record);
                     const approval = localApprovals[key];
@@ -684,7 +771,7 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
                     const isLocallyAllowed = Boolean(approval?.remark);
                     return (
                       <tr
-                        key={record.CardRecordID}
+                        key={record._id || record.CardRecordID}
                         className={`hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors ${isNew ? 'table-row-new' : ''}`}
                       >
                         {/* Gate */}
@@ -693,6 +780,18 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
                             <span className="text-base leading-none">{gate.icon}</span>
                             {gate.label}
                           </span>
+                        </td>
+
+                        {/* Photo */}
+                        <td className="px-3 py-3">
+                          <LivePersonPhoto
+                            cardId={record.CardData}
+                            name={record.CarNumber || record.PName}
+                            onClick={() => {
+                              const u = getPersonPhotoUrl(record.CardData);
+                              if (u) setSelectedPhotoUrl(u);
+                            }}
+                          />
                         </td>
 
                         {/* Card ID */}
@@ -705,6 +804,20 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
                         {/* Type */}
                         <td className="px-3 py-3 text-center">
                           <VehicleBadge type={record.vehicleType} />
+                        </td>
+
+                        {/* Brand */}
+                        <td className="px-3 py-3 hidden md:table-cell">
+                          <span className="text-xs text-slate-700 dark:text-slate-300">
+                            {record.vehicle_brand || '-'}
+                          </span>
+                        </td>
+
+                        {/* Color */}
+                        <td className="px-3 py-3 hidden md:table-cell">
+                          <span className="text-xs text-slate-700 dark:text-slate-300">
+                            {record.vehicle_color || '-'}
+                          </span>
                         </td>
 
                         {/* Company Name */}
@@ -857,6 +970,28 @@ export default function LiveEntryExitPage({ dark, setDark, onNavigate, onLogout,
         </div>
       )}
 
+      {selectedPhotoUrl && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm cursor-pointer"
+          onClick={() => setSelectedPhotoUrl(null)}
+        >
+          <div className="relative max-w-lg max-h-[85vh] rounded-2xl overflow-hidden bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-2 flex flex-col items-center">
+            <button
+              className="absolute top-4 right-4 bg-slate-900/60 hover:bg-slate-900/80 text-white rounded-full p-2 transition-colors z-10"
+              onClick={() => setSelectedPhotoUrl(null)}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <img
+              src={selectedPhotoUrl}
+              alt="Cardholder"
+              className="max-w-full max-h-[75vh] rounded-xl object-contain"
+            />
+          </div>
+        </div>
+      )}
 
       <footer className="border-t border-slate-200 dark:border-slate-800 py-3 px-4">
         <div className="max-w-screen-2xl mx-auto flex items-center justify-between text-xs text-slate-400 dark:text-slate-600">

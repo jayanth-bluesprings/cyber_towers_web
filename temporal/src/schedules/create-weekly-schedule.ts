@@ -105,7 +105,7 @@ async function createWeeklyReportSchedule(): Promise<void> {
         // OVERLAP POLICY: If WF5 is somehow still running when the next
         // Monday fires (shouldn't happen — WF5 completes in ~15 seconds),
         // skip starting a new one. Prevents duplicate reports.
-        overlap: ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_SKIP,
+        overlap: ScheduleOverlapPolicy.SKIP,
       },
 
       // ── HUMAN-READABLE DESCRIPTION ───────────────────────────
