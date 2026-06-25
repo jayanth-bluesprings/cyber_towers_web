@@ -39,3 +39,31 @@ backend/database/backups/
 
 # Editor lock / temp files
 ~$*
+
+# Doc / report artifacts — generated documentation, diagrams, screenshots
+*.docx
+*.excalidraw
+*.vbs
+IMPLEMENTATION_ROADMAP.md
+PHASE_*_COMPLETION_REPORT.md
+PHASE_*_SUMMARY.txt
+TEMPORAL_WORKFLOWS.*
+Temporal_Workflow_Diagrams*.html
+Temporal_Workflows_CEO_Brief.html
+Vehicle_Access_Flow_Guide.html
+excalidraw_*.html
+generate-*.js
+gen_*.js
+configuration.png
+d1-top.png
+dark-mode.png
+dashboard.png
+diag1.png
+diag1b.png
+excalidraw-*.png
+live-entry-exit.png
+overview2.png
+reports.png
+reset-view.png
+temporal-ui.png
+.playwright-mcp/
